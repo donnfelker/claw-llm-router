@@ -1,0 +1,43 @@
+{
+  "id": "claw-llm-router",
+  "name": "Claw LLM Router",
+  "description": "Local prompt classifier that routes to the cheapest capable model. 15-dimension weighted scoring, <1ms local routing. Supports any OpenAI-compatible provider + Anthropic native API. Direct to providers via your own API keys — no third parties.",
+  "version": "1.0.0",
+  "author": "Donn Felker",
+  "license": "MIT",
+  "repository": "https://github.com/donnfelker/claw-llm-router",
+  "entryPoint": "index.ts",
+  "providers": ["claw-llm-router"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "port": {
+        "type": "number",
+        "description": "Local proxy port (default: 8401)"
+      },
+      "defaultModel": {
+        "type": "string",
+        "description": "Default routing model (default: claw-llm-router/auto)"
+      },
+      "tiers": {
+        "type": "object",
+        "description": "Model assignment per tier (format: provider/model-id)",
+        "properties": {
+          "SIMPLE": { "type": "string", "description": "Model for simple tasks (e.g., google/gemini-2.5-flash)" },
+          "MEDIUM": { "type": "string", "description": "Model for medium tasks (e.g., anthropic/claude-haiku-4-5-20251001)" },
+          "COMPLEX": { "type": "string", "description": "Model for complex tasks (e.g., anthropic/claude-sonnet-4-6)" },
+          "REASONING": { "type": "string", "description": "Model for reasoning tasks (e.g., anthropic/claude-opus-4-6)" }
+        }
+      },
+      "classifierModel": {
+        "type": "string",
+        "description": "Model for LLM-assisted classification when rule-based confidence is low (e.g., google/gemini-2.5-flash)"
+      }
+    }
+  },
+  "uiHints": {
+    "port": { "label": "Proxy Port", "placeholder": "8401" },
+    "defaultModel": { "label": "Default Model", "placeholder": "claw-llm-router/auto" }
+  }
+}
