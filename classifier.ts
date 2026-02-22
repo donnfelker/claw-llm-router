@@ -68,25 +68,25 @@ const WEIGHTS: Record<string, number> = {
   tokenCount:         0.08,
   codePresence:       0.15,
   reasoningMarkers:   0.18,
-  technicalTerms:     0.10,
-  creativeMarkers:    0.05,
+  technicalTerms:     0.13,
+  creativeMarkers:    0.04,
   simpleIndicators:   0.02,
-  multiStepPatterns:  0.12,
-  questionComplexity: 0.05,
-  imperativeVerbs:    0.03,
+  multiStepPatterns:  0.10,
+  questionComplexity: 0.04,
+  imperativeVerbs:    0.05,
   constraintCount:    0.04,
   outputFormat:       0.03,
   referenceComplexity:0.02,
   negationComplexity: 0.01,
   domainSpecificity:  0.02,
-  agenticTask:        0.04,
+  agenticTask:        0.06,
 };
 
 // ── Tier boundaries ───────────────────────────────────────────────────────────
 
 const SIMPLE_MEDIUM_BOUNDARY    = 0.0;
-const MEDIUM_COMPLEX_BOUNDARY   = 0.3;
-const COMPLEX_REASONING_BOUNDARY = 0.5;
+const MEDIUM_COMPLEX_BOUNDARY   = 0.15;
+const COMPLEX_REASONING_BOUNDARY = 0.35;
 const CONFIDENCE_THRESHOLD      = 0.70;
 const CONFIDENCE_STEEPNESS      = 12.0;
 const MAX_TOKENS_FORCE_COMPLEX  = 100_000;
@@ -291,6 +291,27 @@ export function classify(
     signals.push(`reasoning override (${reasoningMatchCount} markers)`);
     return {
       tier: "REASONING",
+      confidence: conf,
+      score: weightedScore,
+      signals,
+      reasoningMatches: reasoningMatchCount,
+    };
+  }
+
+  // Strong complexity signals → force COMPLEX
+  // (mirrors the REASONING override pattern)
+  const techMatches = countKeywords(userText, TECHNICAL_KEYWORDS);
+  const imperativeMatches = countKeywords(userText, IMPERATIVE_VERBS);
+  const agenticMatches = countKeywords(userText, AGENTIC_TASK_KEYWORDS);
+  const complexitySignals = techMatches.length + imperativeMatches.length + agenticMatches.length;
+  const hasMultiStep = MULTI_STEP_PATTERNS.some((p) => p.test(userText));
+  const isLongPrompt = userText.length > 300;
+
+  if (complexitySignals >= 4 && (hasMultiStep || isLongPrompt)) {
+    const conf = Math.max(sigmoid(weightedScore), 0.85);
+    signals.push(`complex override (${complexitySignals} signals: ${[...techMatches, ...imperativeMatches].slice(0, 3).join(", ")})`);
+    return {
+      tier: "COMPLEX",
       confidence: conf,
       score: weightedScore,
       signals,
