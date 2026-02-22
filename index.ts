@@ -25,6 +25,7 @@ import {
   DEFAULT_TIERS,
   resolveTierModel,
 } from "./tier-config.js";
+import { consumeOverride } from "./providers/model-override.js";
 
 // ── Types (duck-typed to match OpenClaw plugin API) ───────────────────────────
 
@@ -44,6 +45,23 @@ type ModelProviderConfig = {
 type OpenClawConfig = Record<string, unknown> & {
   models?: { providers?: Record<string, ModelProviderConfig> };
   agents?: Record<string, unknown>;
+};
+
+type BeforeModelResolveEvent = {
+  prompt: string;
+};
+
+type BeforeModelResolveContext = {
+  agentId?: string;
+  sessionKey?: string;
+  sessionId?: string;
+  workspaceDir?: string;
+  messageProvider?: string;
+};
+
+type BeforeModelResolveResult = {
+  modelOverride?: string;
+  providerOverride?: string;
 };
 
 type OpenClawPluginApi = {
@@ -71,6 +89,11 @@ type OpenClawPluginApi = {
       config: Record<string, unknown>;
     }) => { text: string } | Promise<{ text: string }>;
   }) => void;
+  on: (
+    hookName: string,
+    handler: (...args: unknown[]) => unknown,
+    opts?: { priority?: number },
+  ) => void;
 };
 
 // ── Config file paths ─────────────────────────────────────────────────────────
@@ -397,6 +420,31 @@ export default {
         };
       },
     });
+
+    // 8. Register before_model_resolve hook for OAuth model override
+    //    When the router is the primary model and Anthropic OAuth is detected,
+    //    the proxy sets a pending model override before calling the gateway.
+    //    This hook intercepts the agent session and redirects it to the actual
+    //    Anthropic model, breaking the recursion loop.
+    api.on(
+      "before_model_resolve",
+      (event: unknown, _ctx: unknown) => {
+        const { prompt } = event as BeforeModelResolveEvent;
+        if (!prompt) return;
+        const override = consumeOverride(prompt);
+        if (override) {
+          log.info(
+            `${LOG_PREFIX} Model override: ${override.provider}/${override.model} (via before_model_resolve hook)`,
+          );
+          return {
+            modelOverride: override.model,
+            providerOverride: override.provider,
+          } as BeforeModelResolveResult;
+        }
+      },
+      { priority: 100 }, // High priority to run before other hooks
+    );
+    log.info(`${LOG_PREFIX} Registered before_model_resolve hook for OAuth override`);
 
     log.info(`${LOG_PREFIX} Plugin ready`);
   },

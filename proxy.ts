@@ -2,49 +2,22 @@
  * Claw LLM Router — In-Process HTTP Proxy
  *
  * Runs inside the OpenClaw gateway process (no subprocess).
- * Classifies prompts locally, then routes to the right model by forwarding
- * through the OpenClaw gateway's own /v1/chat/completions endpoint.
+ * Classifies prompts locally, then routes to the right model via
+ * direct provider calls (OpenAI-compatible, Anthropic Messages API,
+ * or gateway fallback for OAuth tokens).
  *
- * This means the proxy does NOT handle provider-specific auth or format
- * conversion — the gateway handles all of that. The proxy just adds
- * intelligent model selection on top.
- *
- * Auth is NEVER stored in the plugin — the gateway handles all provider auth.
+ * Auth is NEVER stored in the plugin — keys are read from OpenClaw's auth stores.
  */
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFileSync } from "node:fs";
 import { classify, tierFromModelId, FALLBACK_CHAIN, type Tier } from "./classifier.js";
 import { PROXY_PORT } from "./models.js";
-import { loadTierConfig, getClassifierModelSpec, type TierModelSpec } from "./tier-config.js";
+import { loadTierConfig, getClassifierModelSpec } from "./tier-config.js";
 import { llmClassify } from "./llm-classifier.js";
+import { callProvider } from "./providers/index.js";
+import type { PluginLogger, ChatMessage } from "./providers/types.js";
 
-type PluginLogger = {
-  info: (msg: string) => void;
-  warn: (msg: string) => void;
-  error: (msg: string) => void;
-};
-
-// ── Gateway config ───────────────────────────────────────────────────────────
-
-const HOME = process.env.HOME;
-if (!HOME) throw new Error("[claw-llm-router] HOME environment variable not set");
-const OPENCLAW_CONFIG_PATH = `${HOME}/.openclaw/openclaw.json`;
-
-type GatewayInfo = { port: number; token: string };
-
-function getGatewayInfo(): GatewayInfo {
-  const raw = readFileSync(OPENCLAW_CONFIG_PATH, "utf8");
-  const config = JSON.parse(raw) as { gateway?: { port?: number; auth?: { token?: string } } };
-  return {
-    port: config.gateway?.port ?? 18789,
-    token: config.gateway?.auth?.token ?? "",
-  };
-}
-
-// ── Message types ─────────────────────────────────────────────────────────────
-
-type ChatMessage = { role: string; content: string | unknown };
+// ── Message extraction ───────────────────────────────────────────────────────
 
 function extractUserPrompt(messages: ChatMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -69,66 +42,6 @@ function extractSystemPrompt(messages: ChatMessage[]): string {
     .join(" ");
 }
 
-// ── Route through OpenClaw gateway ───────────────────────────────────────────
-// The gateway handles all provider-specific auth and format conversion.
-// We just forward the request with the right model ID.
-
-async function routeThroughGateway(
-  spec: TierModelSpec,
-  body: Record<string, unknown>,
-  stream: boolean,
-  res: ServerResponse,
-  log: PluginLogger,
-): Promise<void> {
-  const gw = getGatewayInfo();
-  const modelId = `${spec.provider}/${spec.modelId}`;
-  const url = `http://127.0.0.1:${gw.port}/v1/chat/completions`;
-
-  const payload = {
-    ...body,
-    model: modelId,
-    stream,
-  };
-
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${gw.token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!resp.ok) {
-    const errText = await resp.text();
-    throw new Error(`Gateway → ${modelId} ${resp.status}: ${errText.slice(0, 300)}`);
-  }
-
-  if (stream) {
-    res.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "X-Accel-Buffering": "no",
-    });
-    const reader = resp.body?.getReader();
-    if (!reader) throw new Error(`No response body from gateway for ${modelId}`);
-    const decoder = new TextDecoder();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!res.writableEnded) res.write(decoder.decode(value, { stream: true }));
-    }
-    if (!res.writableEnded) res.end();
-    log.info(`Streamed → ${modelId}`);
-  } else {
-    const data = await resp.json() as Record<string, unknown>;
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(data));
-    const usage = (data.usage ?? {}) as Record<string, number>;
-    log.info(`Complete → ${modelId} in=${usage.prompt_tokens ?? "?"} out=${usage.completion_tokens ?? "?"}`);
-  }
-}
-
 // ── Request router ────────────────────────────────────────────────────────────
 
 async function handleChatCompletion(
@@ -144,14 +57,23 @@ async function handleChatCompletion(
   const userPrompt = extractUserPrompt(messages);
   const systemPrompt = extractSystemPrompt(messages);
 
+  // OpenClaw packs entire conversation history into a single user message
+  // for subagent/compaction requests (starts with "[Chat messages since").
+  // These internal requests can't be meaningfully classified — default to MEDIUM.
+  const isPackedContext = userPrompt.startsWith("[Chat messages since")
+    || userPrompt.startsWith("[chat messages since");
+
   // Determine tier
   let tier: Tier;
   const tierOverride = tierFromModelId(modelId);
   if (tierOverride) {
     tier = tierOverride;
     log.info(`Forced tier=${tier} (model=${modelId})`);
+  } else if (isPackedContext) {
+    tier = "MEDIUM";
+    log.info(`Packed context detected (${userPrompt.length} chars) → default MEDIUM`);
   } else {
-    const result = classify(userPrompt, systemPrompt);
+    const result = classify(userPrompt);
     tier = result.tier;
     log.info(
       `Classified tier=${tier} score=${result.score.toFixed(3)} conf=${result.confidence.toFixed(2)} signals=[${result.signals.slice(0, 3).join(", ")}]`,
@@ -186,7 +108,7 @@ async function handleChatCompletion(
   for (const attemptTier of chain) {
     const spec = tierConfig[attemptTier];
     try {
-      await routeThroughGateway(spec, body, stream, res, log);
+      await callProvider(spec, body, stream, res, log);
       return; // success
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));

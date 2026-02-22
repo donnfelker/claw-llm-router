@@ -134,10 +134,9 @@ export function classify(
   prompt: string,
   systemPrompt?: string,
 ): ClassificationResult {
-  const fullText = `${systemPrompt ?? ""} ${prompt}`.toLowerCase();
   const userText = prompt.toLowerCase();
 
-  const estimatedTokens = Math.floor(fullText.length / 4);
+  const estimatedTokens = Math.floor(userText.length / 4);
   const signals: string[] = [];
   const dimScores: Record<string, number> = {};
 
@@ -154,7 +153,7 @@ export function classify(
 
   // 2. Code presence
   {
-    const [score, sig] = scoreKeywords(fullText, CODE_KEYWORDS, 1, 2, 0, 0.5, 1.0, "code");
+    const [score, sig] = scoreKeywords(userText, CODE_KEYWORDS, 1, 2, 0, 0.5, 1.0, "code");
     dimScores.codePresence = score;
     if (sig) signals.push(sig);
   }
@@ -177,27 +176,27 @@ export function classify(
 
   // 4. Technical terms
   {
-    const [score, sig] = scoreKeywords(fullText, TECHNICAL_KEYWORDS, 2, 4, 0, 0.5, 1.0, "technical");
+    const [score, sig] = scoreKeywords(userText, TECHNICAL_KEYWORDS, 2, 4, 0, 0.5, 1.0, "technical");
     dimScores.technicalTerms = score;
     if (sig) signals.push(sig);
   }
 
   // 5. Creative markers
   {
-    const [score, sig] = scoreKeywords(fullText, CREATIVE_KEYWORDS, 1, 2, 0, 0.5, 0.7, "creative");
+    const [score, sig] = scoreKeywords(userText, CREATIVE_KEYWORDS, 1, 2, 0, 0.5, 0.7, "creative");
     dimScores.creativeMarkers = score;
     if (sig) signals.push(sig);
   }
 
   // 6. Simple indicators (negative signal)
   {
-    const [score, sig] = scoreKeywords(fullText, SIMPLE_KEYWORDS, 1, 2, 0, -1.0, -1.0, "simple");
+    const [score, sig] = scoreKeywords(userText, SIMPLE_KEYWORDS, 1, 2, 0, -1.0, -1.0, "simple");
     dimScores.simpleIndicators = score;
     if (sig) signals.push(sig);
   }
 
   // 7. Multi-step patterns
-  if (MULTI_STEP_PATTERNS.some((p) => p.test(fullText))) {
+  if (MULTI_STEP_PATTERNS.some((p) => p.test(userText))) {
     dimScores.multiStepPatterns = 0.5;
     signals.push("multi-step");
   } else {
@@ -211,49 +210,49 @@ export function classify(
 
   // 9. Imperative verbs
   {
-    const [score, sig] = scoreKeywords(fullText, IMPERATIVE_VERBS, 1, 2, 0, 0.3, 0.5, "imperative");
+    const [score, sig] = scoreKeywords(userText, IMPERATIVE_VERBS, 1, 2, 0, 0.3, 0.5, "imperative");
     dimScores.imperativeVerbs = score;
     if (sig) signals.push(sig);
   }
 
   // 10. Constraint indicators
   {
-    const [score, sig] = scoreKeywords(fullText, CONSTRAINT_INDICATORS, 1, 3, 0, 0.3, 0.7, "constraints");
+    const [score, sig] = scoreKeywords(userText, CONSTRAINT_INDICATORS, 1, 3, 0, 0.3, 0.7, "constraints");
     dimScores.constraintCount = score;
     if (sig) signals.push(sig);
   }
 
   // 11. Output format keywords
   {
-    const [score, sig] = scoreKeywords(fullText, OUTPUT_FORMAT_KEYWORDS, 1, 2, 0, 0.4, 0.7, "format");
+    const [score, sig] = scoreKeywords(userText, OUTPUT_FORMAT_KEYWORDS, 1, 2, 0, 0.4, 0.7, "format");
     dimScores.outputFormat = score;
     if (sig) signals.push(sig);
   }
 
   // 12. Reference complexity
   {
-    const [score, sig] = scoreKeywords(fullText, REFERENCE_KEYWORDS, 1, 2, 0, 0.3, 0.5, "references");
+    const [score, sig] = scoreKeywords(userText, REFERENCE_KEYWORDS, 1, 2, 0, 0.3, 0.5, "references");
     dimScores.referenceComplexity = score;
     if (sig) signals.push(sig);
   }
 
   // 13. Negation complexity
   {
-    const [score, sig] = scoreKeywords(fullText, NEGATION_KEYWORDS, 2, 3, 0, 0.3, 0.5, "negation");
+    const [score, sig] = scoreKeywords(userText, NEGATION_KEYWORDS, 2, 3, 0, 0.3, 0.5, "negation");
     dimScores.negationComplexity = score;
     if (sig) signals.push(sig);
   }
 
   // 14. Domain specificity
   {
-    const [score, sig] = scoreKeywords(fullText, DOMAIN_SPECIFIC_KEYWORDS, 1, 2, 0, 0.5, 0.8, "domain-specific");
+    const [score, sig] = scoreKeywords(userText, DOMAIN_SPECIFIC_KEYWORDS, 1, 2, 0, 0.5, 0.8, "domain-specific");
     dimScores.domainSpecificity = score;
     if (sig) signals.push(sig);
   }
 
   // 15. Agentic task
   {
-    const matches = countKeywords(fullText, AGENTIC_TASK_KEYWORDS);
+    const matches = countKeywords(userText, AGENTIC_TASK_KEYWORDS);
     if (matches.length >= 4) {
       dimScores.agenticTask = 1.0;
       signals.push(`agentic (${matches.slice(0, 3).join(", ")})`);
