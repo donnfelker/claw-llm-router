@@ -4,14 +4,19 @@
  * Called when the rule-based classifier has low confidence (ambiguous prompts).
  * Makes a single, minimal LLM call to a cheap model to classify the tier.
  *
- * IMPORTANT: Makes DIRECT HTTP calls to the provider — does NOT go through the
- * router proxy. This prevents infinite recursion (router → classifier → router).
+ * Routes through the OpenClaw gateway (NOT through the router proxy) to avoid
+ * infinite recursion and to leverage the gateway's provider auth handling.
  */
 
+import { readFileSync } from "node:fs";
 import type { Tier } from "./classifier.js";
 import type { TierModelSpec } from "./tier-config.js";
 
 type LogFn = (msg: string) => void;
+
+const HOME = process.env.HOME;
+if (!HOME) throw new Error("[claw-llm-router] HOME environment variable not set");
+const OPENCLAW_CONFIG_PATH = `${HOME}/.openclaw/openclaw.json`;
 
 const VALID_TIERS = new Set<string>(["SIMPLE", "MEDIUM", "COMPLEX", "REASONING"]);
 
@@ -26,66 +31,13 @@ Categories:
 User prompt:
 `;
 
-const ANTHROPIC_VERSION = "2023-06-01";
-
-function anthropicHeaders(apiKey: string): Record<string, string> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    "anthropic-version": ANTHROPIC_VERSION,
+function getGatewayInfo(): { port: number; token: string } {
+  const raw = readFileSync(OPENCLAW_CONFIG_PATH, "utf8");
+  const config = JSON.parse(raw) as { gateway?: { port?: number; auth?: { token?: string } } };
+  return {
+    port: config.gateway?.port ?? 18789,
+    token: config.gateway?.auth?.token ?? "",
   };
-  if (apiKey.startsWith("sk-ant-oat")) {
-    headers["Authorization"] = `Bearer ${apiKey}`;
-  } else {
-    headers["x-api-key"] = apiKey;
-  }
-  return headers;
-}
-
-async function callAnthropic(spec: TierModelSpec, prompt: string): Promise<string> {
-  const url = `${spec.baseUrl}/messages`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: anthropicHeaders(spec.apiKey),
-    body: JSON.stringify({
-      model: spec.modelId,
-      max_tokens: 10,
-      temperature: 0,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-
-  if (!resp.ok) {
-    const errText = await resp.text();
-    throw new Error(`Anthropic classifier ${resp.status}: ${errText.slice(0, 200)}`);
-  }
-
-  const data = await resp.json() as { content?: Array<{ text?: string }> };
-  return data.content?.[0]?.text?.trim() ?? "";
-}
-
-async function callOpenAICompatible(spec: TierModelSpec, prompt: string): Promise<string> {
-  const url = `${spec.baseUrl}/chat/completions`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${spec.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: spec.modelId,
-      max_tokens: 10,
-      temperature: 0,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-
-  if (!resp.ok) {
-    const errText = await resp.text();
-    throw new Error(`${spec.provider} classifier ${resp.status}: ${errText.slice(0, 200)}`);
-  }
-
-  const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
-  return data.choices?.[0]?.message?.content?.trim() ?? "";
 }
 
 export async function llmClassify(
@@ -96,13 +48,35 @@ export async function llmClassify(
   // Truncate prompt to keep classifier call cheap
   const truncated = userPrompt.slice(0, 500);
   const fullPrompt = CLASSIFIER_PROMPT + truncated;
+  const modelId = `${classifierSpec.provider}/${classifierSpec.modelId}`;
 
-  let responseText: string;
-  if (classifierSpec.isAnthropic) {
-    responseText = await callAnthropic(classifierSpec, fullPrompt);
-  } else {
-    responseText = await callOpenAICompatible(classifierSpec, fullPrompt);
+  // Route through OpenClaw gateway (NOT the router proxy) to:
+  // 1. Avoid infinite recursion
+  // 2. Leverage the gateway's provider auth handling
+  const gw = getGatewayInfo();
+  const url = `http://127.0.0.1:${gw.port}/v1/chat/completions`;
+
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${gw.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: modelId,
+      max_tokens: 10,
+      temperature: 0,
+      messages: [{ role: "user", content: fullPrompt }],
+    }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`LLM classifier ${resp.status}: ${errText.slice(0, 200)}`);
   }
+
+  const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
+  const responseText = data.choices?.[0]?.message?.content?.trim() ?? "";
 
   const result = responseText.toUpperCase().trim();
   if (VALID_TIERS.has(result)) {

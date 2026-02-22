@@ -1,12 +1,17 @@
 /**
  * Claw LLM Router — Tier Configuration
  *
- * Reads/writes tier-to-model mappings from openclaw.json plugin config.
+ * Reads/writes tier-to-model mappings from a local config file (router-config.json).
  * Resolves provider baseUrl and apiKey for any OpenClaw provider.
  * Auth is NEVER stored in the plugin — always read from OpenClaw's auth stores.
+ *
+ * Config is stored in the plugin directory (not in openclaw.json) because
+ * OpenClaw validates plugins.entries schema and rejects unknown keys.
  */
 
-import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, writeFileSync, existsSync } from "node:fs";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Tier } from "./classifier.js";
 
 const HOME = process.env.HOME;
@@ -15,7 +20,10 @@ if (!HOME) throw new Error("[claw-llm-router] HOME environment variable not set"
 const OPENCLAW_CONFIG_PATH = `${HOME}/.openclaw/openclaw.json`;
 const AUTH_PROFILES_PATH = `${HOME}/.openclaw/agents/main/agent/auth-profiles.json`;
 const AUTH_JSON_PATH = `${HOME}/.openclaw/agents/main/agent/auth.json`;
-const PROVIDER_ID = "claw-llm-router";
+
+// Router config stored in plugin directory to avoid openclaw.json schema conflicts
+const PLUGIN_DIR = dirname(fileURLToPath(import.meta.url));
+const ROUTER_CONFIG_PATH = `${PLUGIN_DIR}/router-config.json`;
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +37,11 @@ export type TierModelSpec = {
 
 export type TierConfig = Record<Tier, TierModelSpec>;
 
+type RouterConfig = {
+  tiers: Record<Tier, string>;
+  classifierModel?: string;
+};
+
 // ── Defaults ─────────────────────────────────────────────────────────────────
 
 export const DEFAULT_TIERS: Record<Tier, string> = {
@@ -39,7 +52,6 @@ export const DEFAULT_TIERS: Record<Tier, string> = {
 };
 
 // ── Well-known provider base URLs ────────────────────────────────────────────
-// Used when a provider isn't in openclaw.json models.providers
 
 const WELL_KNOWN_BASE_URLS: Record<string, string> = {
   anthropic: "https://api.anthropic.com/v1",
@@ -66,14 +78,21 @@ function readOpenClawConfig(): Record<string, unknown> {
   return JSON.parse(raw) as Record<string, unknown>;
 }
 
-function getPluginConfig(): Record<string, unknown> | undefined {
+function readRouterConfig(): RouterConfig | undefined {
   try {
-    const config = readOpenClawConfig();
-    const plugins = config.plugins as { entries?: Record<string, Record<string, unknown>> } | undefined;
-    return plugins?.entries?.[PROVIDER_ID];
+    if (!existsSync(ROUTER_CONFIG_PATH)) return undefined;
+    const raw = readFileSync(ROUTER_CONFIG_PATH, "utf8");
+    return JSON.parse(raw) as RouterConfig;
   } catch {
     return undefined;
   }
+}
+
+function writeRouterConfigFile(config: RouterConfig): void {
+  const tmp = `${ROUTER_CONFIG_PATH}.tmp.${process.pid}`;
+  writeFileSync(tmp, JSON.stringify(config, null, 2), "utf8");
+  JSON.parse(readFileSync(tmp, "utf8")); // Validate
+  renameSync(tmp, ROUTER_CONFIG_PATH);
 }
 
 function envVarName(provider: string): string {
@@ -154,7 +173,6 @@ function resolveBaseUrl(provider: string): string {
   const wellKnown = WELL_KNOWN_BASE_URLS[provider];
   if (wellKnown) return wellKnown;
 
-  // Last resort — assume OpenAI-compatible on standard path
   throw new Error(`[claw-llm-router] Unknown provider "${provider}" — not in openclaw.json and no well-known URL. Configure it in openclaw.json models.providers or use /router set.`);
 }
 
@@ -178,14 +196,13 @@ export function resolveTierModel(tierString: string, log?: LogFn): TierModelSpec
 // ── Tier Config Read/Write ───────────────────────────────────────────────────
 
 export function isTierConfigured(): boolean {
-  const pluginConfig = getPluginConfig();
-  const tiers = pluginConfig?.tiers as Record<string, string> | undefined;
-  return !!tiers && Object.keys(tiers).length === 4;
+  const config = readRouterConfig();
+  return !!config?.tiers && Object.keys(config.tiers).length === 4;
 }
 
 export function loadTierConfig(log?: LogFn): TierConfig {
-  const pluginConfig = getPluginConfig();
-  const tiers = (pluginConfig?.tiers ?? DEFAULT_TIERS) as Record<Tier, string>;
+  const config = readRouterConfig();
+  const tiers = config?.tiers ?? DEFAULT_TIERS;
 
   return {
     SIMPLE: resolveTierModel(tiers.SIMPLE ?? DEFAULT_TIERS.SIMPLE, log),
@@ -196,8 +213,8 @@ export function loadTierConfig(log?: LogFn): TierConfig {
 }
 
 export function getTierStrings(): Record<Tier, string> {
-  const pluginConfig = getPluginConfig();
-  const tiers = pluginConfig?.tiers as Record<Tier, string> | undefined;
+  const config = readRouterConfig();
+  const tiers = config?.tiers;
   return {
     SIMPLE: tiers?.SIMPLE ?? DEFAULT_TIERS.SIMPLE,
     MEDIUM: tiers?.MEDIUM ?? DEFAULT_TIERS.MEDIUM,
@@ -207,42 +224,27 @@ export function getTierStrings(): Record<Tier, string> {
 }
 
 export function writeTierConfig(tiers: Record<Tier, string>): void {
-  const config = readOpenClawConfig();
-
-  // Ensure plugins.entries.claw-llm-router exists
-  const plugins = (config.plugins ?? {}) as { entries?: Record<string, Record<string, unknown>>; allow?: string[] };
-  if (!plugins.entries) plugins.entries = {};
-  if (!plugins.entries[PROVIDER_ID]) plugins.entries[PROVIDER_ID] = { enabled: true };
-  plugins.entries[PROVIDER_ID].tiers = tiers;
-  config.plugins = plugins;
-
-  // Atomic write
-  const tmp = `${OPENCLAW_CONFIG_PATH}.tmp.${process.pid}`;
-  writeFileSync(tmp, JSON.stringify(config, null, 2), "utf8");
-  JSON.parse(readFileSync(tmp, "utf8")); // Validate
-  renameSync(tmp, OPENCLAW_CONFIG_PATH);
+  const existing = readRouterConfig();
+  writeRouterConfigFile({
+    ...existing,
+    tiers,
+  });
 }
 
 // ── Classifier Model ─────────────────────────────────────────────────────────
 
 export function getClassifierModelSpec(log?: LogFn): TierModelSpec {
-  const pluginConfig = getPluginConfig();
-  const classifierModel = pluginConfig?.classifierModel as string | undefined;
+  const config = readRouterConfig();
+  const classifierModel = config?.classifierModel;
   // Default to SIMPLE tier model (cheapest)
   const modelString = classifierModel ?? getTierStrings().SIMPLE;
   return resolveTierModel(modelString, log);
 }
 
 export function writeClassifierModel(modelString: string): void {
-  const config = readOpenClawConfig();
-  const plugins = (config.plugins ?? {}) as { entries?: Record<string, Record<string, unknown>> };
-  if (!plugins.entries) plugins.entries = {};
-  if (!plugins.entries[PROVIDER_ID]) plugins.entries[PROVIDER_ID] = { enabled: true };
-  plugins.entries[PROVIDER_ID].classifierModel = modelString;
-  config.plugins = plugins;
-
-  const tmp = `${OPENCLAW_CONFIG_PATH}.tmp.${process.pid}`;
-  writeFileSync(tmp, JSON.stringify(config, null, 2), "utf8");
-  JSON.parse(readFileSync(tmp, "utf8"));
-  renameSync(tmp, OPENCLAW_CONFIG_PATH);
+  const existing = readRouterConfig() ?? { tiers: DEFAULT_TIERS };
+  writeRouterConfigFile({
+    ...existing,
+    classifierModel: modelString,
+  });
 }

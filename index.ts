@@ -182,27 +182,6 @@ function injectAuthProfile(log: PluginLogger): void {
   }
 }
 
-// ── Ensure plugins.entries has our plugin ──────────────────────────────────────
-
-function ensurePluginEntry(log: PluginLogger): void {
-  try {
-    const raw = readFileSync(OPENCLAW_CONFIG_PATH, "utf8");
-    const config = JSON.parse(raw) as Record<string, unknown>;
-    const plugins = config.plugins as { entries?: Record<string, unknown> } | undefined;
-    if (plugins?.entries?.[PROVIDER_ID]) return; // already exists
-
-    if (!plugins) (config as Record<string, unknown>).plugins = { entries: {} };
-    const p = config.plugins as { entries?: Record<string, unknown> };
-    if (!p.entries) p.entries = {};
-    p.entries[PROVIDER_ID] = { enabled: true };
-
-    atomicWriteJson(OPENCLAW_CONFIG_PATH, config);
-    log.info(`${LOG_PREFIX} Plugin entry added to openclaw.json`);
-  } catch (err) {
-    log.warn(`${LOG_PREFIX} Could not ensure plugin entry: ${err}`);
-  }
-}
-
 // ── /router command handlers ─────────────────────────────────────────────────
 
 const TIER_SUGGESTIONS: Record<string, string> = {
@@ -325,16 +304,13 @@ export default {
     // 4. Inject auth profile placeholder
     injectAuthProfile(log);
 
-    // 5. Ensure plugins.entries has our plugin
-    ensurePluginEntry(log);
-
-    // 6. Auto-configure default tiers on first run
+    // 5. Auto-configure default tiers on first run
     if (!isTierConfigured()) {
       writeTierConfig(DEFAULT_TIERS);
       log.info(`${LOG_PREFIX} First run: default tier config written. Use /router setup to customize.`);
     }
 
-    // 7. Register service (manages proxy lifecycle with gateway)
+    // 6. Register service (manages proxy lifecycle with gateway)
     api.registerService({
       id: `${PROVIDER_ID}-proxy`,
 
@@ -371,7 +347,7 @@ export default {
       },
     });
 
-    // 8. Register /router command with subcommands
+    // 7. Register /router command with subcommands
     api.registerCommand({
       name: "router",
       description: "Show router status, configure tiers, or run setup",
