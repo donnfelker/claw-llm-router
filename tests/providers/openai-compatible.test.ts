@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
-import { ServerResponse } from "node:http";
+import type { ServerResponse } from "node:http";
 import { OpenAICompatibleProvider } from "../../providers/openai-compatible.js";
 import type { PluginLogger } from "../../providers/types.js";
 
@@ -15,11 +15,13 @@ function makeLogger(): PluginLogger & { messages: string[] } {
 }
 
 function makeRes(): ServerResponse & { _body: string; _statusCode: number; _headers: Record<string, string>; _ended: boolean } {
-  const res = new ServerResponse({ method: "POST" } as any) as any;
-  res._body = "";
-  res._statusCode = 0;
-  res._headers = {};
-  res._ended = false;
+  const res = {
+    _body: "",
+    _statusCode: 0,
+    _headers: {} as Record<string, string>,
+    _ended: false,
+    writableEnded: false,
+  } as any;
 
   res.writeHead = (statusCode: number, headers?: Record<string, string>) => {
     res._statusCode = statusCode;
@@ -35,7 +37,7 @@ function makeRes(): ServerResponse & { _body: string; _statusCode: number; _head
   res.end = (data?: string | Buffer) => {
     if (data) res._body += typeof data === "string" ? data : data.toString();
     res._ended = true;
-    Object.defineProperty(res, "writableEnded", { value: true, configurable: true });
+    res.writableEnded = true;
     return res;
   };
 
