@@ -99,14 +99,10 @@ function envVarName(provider: string): string {
   return ENV_VAR_OVERRIDES[provider] ?? `${provider.toUpperCase()}_API_KEY`;
 }
 
-function maskKey(key: string): string {
-  if (key.length <= 8) return "***";
-  return `${key.slice(0, 8)}...${key.slice(-3)}`;
-}
-
 // ── API Key Loading ──────────────────────────────────────────────────────────
 // Priority: env var → auth-profiles.json → auth.json → openclaw.json env.vars
 // NEVER stores keys — always reads from existing OpenClaw auth stores.
+// NEVER logs keys or any portion of them.
 
 type LogFn = ((msg: string) => void) | undefined;
 
@@ -115,7 +111,7 @@ export function loadApiKey(provider: string, log?: LogFn): string {
 
   // 1. Environment variable
   if (process.env[envKey]) {
-    log?.(`[auth] ${provider}: found key from env var ${envKey} (${maskKey(process.env[envKey]!)})`);
+    log?.(`[auth] ${provider}: using key from env var ${envKey}`);
     return process.env[envKey]!;
   }
 
@@ -126,7 +122,7 @@ export function loadApiKey(provider: string, log?: LogFn): string {
     const profile = store.profiles?.[`${provider}:default`];
     const key = profile?.token ?? profile?.key;
     if (key && key !== "proxy-handles-auth") {
-      log?.(`[auth] ${provider}: found key from auth-profiles.json (${maskKey(key)})`);
+      log?.(`[auth] ${provider}: using key from auth-profiles.json`);
       return key;
     }
   } catch { /* fall through */ }
@@ -138,7 +134,7 @@ export function loadApiKey(provider: string, log?: LogFn): string {
     const entry = store[provider];
     const key = entry?.key ?? entry?.token;
     if (key && key !== "proxy-handles-auth") {
-      log?.(`[auth] ${provider}: found key from auth.json (${maskKey(key)})`);
+      log?.(`[auth] ${provider}: using key from auth.json`);
       return key;
     }
   } catch { /* fall through */ }
@@ -149,12 +145,12 @@ export function loadApiKey(provider: string, log?: LogFn): string {
     const env = config.env as { vars?: Record<string, string> } | undefined;
     const val = env?.vars?.[envKey];
     if (val) {
-      log?.(`[auth] ${provider}: found key from openclaw.json env.vars (${maskKey(val)})`);
+      log?.(`[auth] ${provider}: using key from openclaw.json env.vars`);
       return val;
     }
   } catch { /* fall through */ }
 
-  log?.(`[auth] ${provider}: NO API KEY FOUND in any source (checked: env ${envKey}, auth-profiles.json, auth.json, openclaw.json env.vars)`);
+  log?.(`[auth] ${provider}: NO API KEY FOUND (checked: env ${envKey}, auth-profiles.json, auth.json, openclaw.json env.vars)`);
   return "";
 }
 
