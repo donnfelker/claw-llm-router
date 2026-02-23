@@ -17,4 +17,4 @@ jobs:
           node-version: "22"
 
       - name: Run tests
-        run: npx tsx --test tests/providers/*.test.ts tests/classifier.test.ts tests/proxy.test.ts
+        run: npx tsx --test tests/providers/*.test.ts tests/classifier.test.ts tests/proxy.test.ts tests/tier-config.test.ts

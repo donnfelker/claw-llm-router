@@ -169,19 +169,6 @@ describe("resolveProvider", () => {
     assert.ok(provider instanceof AnthropicProvider);
   });
 
-  it("uses isOAuth flag for OAuth detection (not key prefix)", () => {
-    // Even with an OAuth-looking key, isOAuth=false means direct provider
-    const provider = resolveProvider(
-      makeSpec({
-        provider: "anthropic",
-        apiKey: "sk-ant-oat01-looks-like-oauth",
-        isAnthropic: true,
-        isOAuth: false,
-      }),
-    );
-    assert.ok(provider instanceof AnthropicProvider);
-  });
-
   it("routes any provider through gateway when isOAuth is true", () => {
     // Even a non-Anthropic provider gets gateway routing with OAuth
     const provider = resolveProvider(
@@ -191,6 +178,28 @@ describe("resolveProvider", () => {
         isAnthropic: false,
         isOAuth: true,
       }),
+    );
+    assert.ok(
+      provider instanceof GatewayProvider || provider.name === "gateway-with-override",
+    );
+  });
+
+  // ── Regression: OAuth tokens must never hit AnthropicProvider ──────────────
+  // AnthropicProvider sends OAuth tokens as x-api-key which returns 401.
+  // OAuth tokens MUST route through the gateway regardless of isAnthropic.
+
+  it("never sends Anthropic OAuth token to AnthropicProvider (isOAuth=true)", () => {
+    const provider = resolveProvider(
+      makeSpec({
+        provider: "anthropic",
+        apiKey: "sk-ant-oat01-real-oauth-token",
+        isAnthropic: true,
+        isOAuth: true,
+      }),
+    );
+    assert.ok(
+      !(provider instanceof AnthropicProvider),
+      "OAuth token must not go to AnthropicProvider — would fail with 401 invalid x-api-key",
     );
     assert.ok(
       provider instanceof GatewayProvider || provider.name === "gateway-with-override",

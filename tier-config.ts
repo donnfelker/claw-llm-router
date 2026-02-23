@@ -145,10 +145,17 @@ export function loadApiKey(provider: string, log?: LogFn): ApiKeyResult {
       const profile = store.profiles?.[profileName];
       if (!profile) continue;
 
-      // OAuth credentials store the token in the `access` field
-      const key = profile.access ?? profile.token ?? profile.key;
+      // OAuth credentials store the token in the `access` field;
+      // only read `access` when profile.type is "oauth" to avoid
+      // picking up stale OAuth tokens from non-OAuth profiles.
+      const profileIsOAuth = profile.type === "oauth";
+      const key = profileIsOAuth
+        ? (profile.access ?? profile.token ?? profile.key)
+        : (profile.token ?? profile.key);
       if (key && key !== "proxy-handles-auth") {
-        const isOAuth = profile.type === "oauth";
+        // Detect OAuth by profile type OR key prefix (OpenClaw stores
+        // Anthropic OAuth tokens with type:"token", not type:"oauth")
+        const isOAuth = profileIsOAuth || key.startsWith("sk-ant-oat01-");
         log?.(`[auth] ${provider}: using key from auth-profiles.json (${profileName}${isOAuth ? ", OAuth" : ""})`);
         return { key, isOAuth };
       }
