@@ -46,3 +46,14 @@ OpenClaw sends chat completion requests to the router, which classifies the prom
 - `before_model_resolve` hook in `index.ts` handles OAuth recursion prevention
 - `setInterval` calls must use `.unref()` to avoid hanging test processes
 - `OpenAICompatibleProvider` strips non-standard request fields (e.g., `store`) to avoid 400 errors
+
+## Adding a New Provider
+
+Most new providers are OpenAI-compatible and only require config changes (base URL, env var, tier suggestions). Providers with non-standard APIs or OAuth need additional work. Read `PROVIDERS.md` for the full step-by-step guide including:
+
+- The `LLMProvider` interface contract
+- How to add well-known base URLs and env var mappings
+- How provider resolution works (OAuth → Gateway, Anthropic → Direct, else → OpenAI-compatible)
+- Request/response format requirements
+- Auth resolution priority order
+- How to handle OAuth credentials and gateway routing
