@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { loadApiKey } from "../tier-config.js";
+import { loadApiKey, parseProfileCredential } from "../tier-config.js";
 
 describe("loadApiKey", () => {
   // These tests use env vars (priority 1) to avoid filesystem dependencies.
@@ -57,5 +57,118 @@ describe("loadApiKey", () => {
       const result = loadApiKey("anthropic");
       assert.equal(result.isOAuth, false);
     });
+  });
+});
+
+// ── Regression tests: OAuth detection from auth-profiles.json profiles ──────
+// These test the profile-parsing logic directly, independent of filesystem.
+// The Anthropic issue: OAuth tokens stored with type:"token" (not "oauth")
+// were not detected as OAuth, causing them to be sent as x-api-key (→ 401).
+
+describe("parseProfileCredential", () => {
+  // ── Anthropic OAuth regression ──────────────────────────────────────────────
+
+  it("detects Anthropic OAuth token with type:'token' by prefix", () => {
+    // OpenClaw stores Anthropic OAuth as type:"token", NOT type:"oauth"
+    // This is the exact shape that caused the original bug
+    const result = parseProfileCredential({
+      type: "token",
+      token: "sk-ant-oat01-real-oauth-token-here",
+    });
+    assert.ok(result, "Should return a result");
+    assert.equal(result.key, "sk-ant-oat01-real-oauth-token-here");
+    assert.equal(result.isOAuth, true, "Must detect OAuth by sk-ant-oat01- prefix even when type is 'token'");
+  });
+
+  it("returns isOAuth=false for Anthropic direct API key with type:'token'", () => {
+    const result = parseProfileCredential({
+      type: "token",
+      token: "sk-ant-api03-direct-key",
+    });
+    assert.ok(result);
+    assert.equal(result.isOAuth, false);
+  });
+
+  it("returns isOAuth=false for Anthropic direct API key with type:'api_key'", () => {
+    const result = parseProfileCredential({
+      type: "api_key",
+      key: "sk-ant-api03-direct-key",
+    });
+    assert.ok(result);
+    assert.equal(result.key, "sk-ant-api03-direct-key");
+    assert.equal(result.isOAuth, false);
+  });
+
+  // ── MiniMax OAuth ───────────────────────────────────────────────────────────
+
+  it("detects MiniMax OAuth token with type:'oauth' and access field", () => {
+    // MiniMax OAuth uses type:"oauth" with token in `access` field
+    const result = parseProfileCredential({
+      type: "oauth",
+      access: "minimax-opaque-access-token",
+    });
+    assert.ok(result, "Should return a result");
+    assert.equal(result.key, "minimax-opaque-access-token");
+    assert.equal(result.isOAuth, true, "Must detect OAuth by type:'oauth'");
+  });
+
+  it("falls back to token field for type:'oauth' if access is missing", () => {
+    const result = parseProfileCredential({
+      type: "oauth",
+      token: "fallback-token",
+    });
+    assert.ok(result);
+    assert.equal(result.key, "fallback-token");
+    assert.equal(result.isOAuth, true);
+  });
+
+  it("falls back to key field for type:'oauth' if access and token missing", () => {
+    const result = parseProfileCredential({
+      type: "oauth",
+      key: "fallback-key",
+    });
+    assert.ok(result);
+    assert.equal(result.key, "fallback-key");
+    assert.equal(result.isOAuth, true);
+  });
+
+  // ── Non-OAuth profiles ──────────────────────────────────────────────────────
+
+  it("does NOT read access field for non-OAuth profiles", () => {
+    // Prevents picking up stale OAuth tokens from api_key profiles
+    // that might have a leftover `access` field
+    const result = parseProfileCredential({
+      type: "api_key",
+      key: "real-api-key",
+      access: "stale-oauth-token",
+    });
+    assert.ok(result);
+    assert.equal(result.key, "real-api-key", "Should use key, not access");
+    assert.equal(result.isOAuth, false);
+  });
+
+  // ── Edge cases ──────────────────────────────────────────────────────────────
+
+  it("returns null for proxy-handles-auth placeholder", () => {
+    const result = parseProfileCredential({
+      type: "api_key",
+      key: "proxy-handles-auth",
+    });
+    assert.equal(result, null);
+  });
+
+  it("returns null for empty profile", () => {
+    const result = parseProfileCredential({});
+    assert.equal(result, null);
+  });
+
+  it("returns null when all fields are undefined", () => {
+    const result = parseProfileCredential({
+      type: "api_key",
+      token: undefined,
+      key: undefined,
+      access: undefined,
+    });
+    assert.equal(result, null);
   });
 });

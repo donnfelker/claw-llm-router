@@ -117,6 +117,23 @@ type LogFn = ((msg: string) => void) | undefined;
 
 export type ApiKeyResult = { key: string; isOAuth: boolean };
 
+// Exported for testing — parses a single auth profile entry into key + OAuth flag.
+export type AuthProfile = { token?: string; key?: string; access?: string; type?: string };
+
+export function parseProfileCredential(profile: AuthProfile): ApiKeyResult | null {
+  const profileIsOAuth = profile.type === "oauth";
+  // OAuth credentials (e.g., MiniMax) store the token in `access`.
+  // Only read `access` for type:"oauth" to avoid stale data on non-OAuth profiles.
+  const key = profileIsOAuth
+    ? (profile.access ?? profile.token ?? profile.key)
+    : (profile.token ?? profile.key);
+  if (!key || key === "proxy-handles-auth") return null;
+  // Detect OAuth by profile type OR key prefix (OpenClaw stores
+  // Anthropic OAuth tokens with type:"token", not type:"oauth")
+  const isOAuth = profileIsOAuth || key.startsWith("sk-ant-oat01-");
+  return { key, isOAuth };
+}
+
 export function loadApiKey(provider: string, log?: LogFn): ApiKeyResult {
   const envKey = envVarName(provider);
 
@@ -138,26 +155,17 @@ export function loadApiKey(provider: string, log?: LogFn): ApiKeyResult {
   try {
     const raw = readFileSync(AUTH_PROFILES_PATH, "utf8");
     const store = JSON.parse(raw) as {
-      profiles?: Record<string, { token?: string; key?: string; access?: string; type?: string }>;
+      profiles?: Record<string, AuthProfile>;
     };
 
     for (const profileName of profileNames) {
       const profile = store.profiles?.[profileName];
       if (!profile) continue;
 
-      // OAuth credentials store the token in the `access` field;
-      // only read `access` when profile.type is "oauth" to avoid
-      // picking up stale OAuth tokens from non-OAuth profiles.
-      const profileIsOAuth = profile.type === "oauth";
-      const key = profileIsOAuth
-        ? (profile.access ?? profile.token ?? profile.key)
-        : (profile.token ?? profile.key);
-      if (key && key !== "proxy-handles-auth") {
-        // Detect OAuth by profile type OR key prefix (OpenClaw stores
-        // Anthropic OAuth tokens with type:"token", not type:"oauth")
-        const isOAuth = profileIsOAuth || key.startsWith("sk-ant-oat01-");
-        log?.(`[auth] ${provider}: using key from auth-profiles.json (${profileName}${isOAuth ? ", OAuth" : ""})`);
-        return { key, isOAuth };
+      const result = parseProfileCredential(profile);
+      if (result) {
+        log?.(`[auth] ${provider}: using key from auth-profiles.json (${profileName}${result.isOAuth ? ", OAuth" : ""})`);
+        return result;
       }
     }
   } catch { /* fall through */ }
