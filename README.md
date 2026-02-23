@@ -97,6 +97,7 @@ flowchart LR
     OAI -->|Direct API| OPENAI[OpenAI]
     OAI -->|Direct API| GROQ[Groq]
     OAI -->|Direct API| XAI[xAI Grok]
+    OAI -->|Direct API| MINIMAX[MiniMax]
     ANT -->|Direct API| ANTAPI[Anthropic API]
     GW -->|Via Gateway| GWSVC[OpenClaw Gateway]
     GWO -->|Via Gateway<br/>+ model override hook| GWSVC
@@ -123,10 +124,10 @@ Provider resolution:
 
 | Condition | Provider | How It Works |
 |-----------|----------|-------------|
-| Non-Anthropic provider | `OpenAICompatibleProvider` | POST to `{baseUrl}/chat/completions` with Bearer auth |
+| Any provider + OAuth token | `GatewayProvider` | Routes through OpenClaw gateway (handles token refresh + API format) |
+| Any provider + OAuth + router is primary model | `gateway-with-override` | Gateway call with `before_model_resolve` hook to prevent recursion |
 | Anthropic + direct API key | `AnthropicProvider` | Converts OpenAI format to Anthropic Messages API |
-| Anthropic + OAuth token | `GatewayProvider` | Routes through OpenClaw gateway (handles OAuth internally) |
-| Anthropic + OAuth + router is primary model | `gateway-with-override` | Gateway call with `before_model_resolve` hook to prevent recursion |
+| All other providers | `OpenAICompatibleProvider` | POST to `{baseUrl}/chat/completions` with Bearer auth |
 
 ### OAuth Model Override (Recursion Prevention)
 

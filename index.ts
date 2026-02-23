@@ -210,7 +210,7 @@ function injectAuthProfile(log: PluginLogger): void {
 const TIER_SUGGESTIONS: Record<string, string> = {
   SIMPLE: "google/gemini-2.5-flash, openai/gpt-4o-mini, groq/llama-3.3-70b-versatile (fast, cheap)",
   MEDIUM: "anthropic/claude-haiku-4-5-20251001, openai/gpt-4o-mini, xai/grok-3 (balanced)",
-  COMPLEX: "anthropic/claude-sonnet-4-6, openai/gpt-4o, xai/grok-3 (capable)",
+  COMPLEX: "anthropic/claude-sonnet-4-6, openai/gpt-4o, xai/grok-3, minimax/MiniMax-M1 (capable)",
   REASONING: "anthropic/claude-opus-4-6, openai/o1 (frontier reasoning)",
 };
 

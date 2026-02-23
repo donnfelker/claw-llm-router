@@ -81,17 +81,15 @@ const gatewayOverrideProvider: LLMProvider = {
 };
 
 export function resolveProvider(spec: TierModelSpec): LLMProvider {
-  if (spec.isAnthropic) {
-    // OAuth tokens can't be used with direct Anthropic API calls
-    if (spec.apiKey.startsWith("sk-ant-oat01-")) {
-      if (getIsRouterPrimary()) {
-        // Route through gateway with model override to break recursion.
-        // The before_model_resolve hook will intercept the agent session
-        // and set the model to the actual Anthropic model.
-        return gatewayOverrideProvider;
-      }
-      return gatewayProvider;
+  // Any provider with OAuth credentials → route through gateway
+  // (gateway handles token refresh and API format conversion)
+  if (spec.isOAuth) {
+    if (getIsRouterPrimary()) {
+      return gatewayOverrideProvider;
     }
+    return gatewayProvider;
+  }
+  if (spec.isAnthropic) {
     return anthropicProvider;
   }
   return openaiCompatibleProvider;

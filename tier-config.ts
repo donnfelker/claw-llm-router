@@ -33,6 +33,7 @@ export type TierModelSpec = {
   baseUrl: string;
   apiKey: string;
   isAnthropic: boolean;
+  isOAuth: boolean;
 };
 
 export type TierConfig = Record<Tier, TierModelSpec>;
@@ -64,11 +65,18 @@ const WELL_KNOWN_BASE_URLS: Record<string, string> = {
   fireworks: "https://api.fireworks.ai/inference/v1",
   perplexity: "https://api.perplexity.ai",
   xai: "https://api.x.ai/v1",
+  minimax: "https://api.minimax.io/v1",
 };
 
 // Provider name → env var name mapping (when not just PROVIDER_API_KEY)
 const ENV_VAR_OVERRIDES: Record<string, string> = {
   google: "GEMINI_API_KEY",
+};
+
+// Provider name → auth-profiles.json provider ID mapping
+// Some providers use a different ID in OpenClaw's auth store
+const AUTH_PROFILE_ALIASES: Record<string, string> = {
+  minimax: "minimax-portal",
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -106,24 +114,43 @@ function envVarName(provider: string): string {
 
 type LogFn = ((msg: string) => void) | undefined;
 
-export function loadApiKey(provider: string, log?: LogFn): string {
+export type ApiKeyResult = { key: string; isOAuth: boolean };
+
+export function loadApiKey(provider: string, log?: LogFn): ApiKeyResult {
   const envKey = envVarName(provider);
 
   // 1. Environment variable
   if (process.env[envKey]) {
+    const key = process.env[envKey]!;
     log?.(`[auth] ${provider}: using key from env var ${envKey}`);
-    return process.env[envKey]!;
+    // Detect OAuth tokens passed via env var
+    const isOAuth = key.startsWith("sk-ant-oat01-");
+    return { key, isOAuth };
   }
 
   // 2. auth-profiles.json (canonical credential store)
+  // Try both the provider name and any alias (e.g., minimax → minimax-portal)
+  const alias = AUTH_PROFILE_ALIASES[provider];
+  const profileNames = [`${provider}:default`];
+  if (alias) profileNames.push(`${alias}:default`);
+
   try {
     const raw = readFileSync(AUTH_PROFILES_PATH, "utf8");
-    const store = JSON.parse(raw) as { profiles?: Record<string, { token?: string; key?: string }> };
-    const profile = store.profiles?.[`${provider}:default`];
-    const key = profile?.token ?? profile?.key;
-    if (key && key !== "proxy-handles-auth") {
-      log?.(`[auth] ${provider}: using key from auth-profiles.json`);
-      return key;
+    const store = JSON.parse(raw) as {
+      profiles?: Record<string, { token?: string; key?: string; access?: string; type?: string }>;
+    };
+
+    for (const profileName of profileNames) {
+      const profile = store.profiles?.[profileName];
+      if (!profile) continue;
+
+      // OAuth credentials store the token in the `access` field
+      const key = profile.access ?? profile.token ?? profile.key;
+      if (key && key !== "proxy-handles-auth") {
+        const isOAuth = profile.type === "oauth";
+        log?.(`[auth] ${provider}: using key from auth-profiles.json (${profileName}${isOAuth ? ", OAuth" : ""})`);
+        return { key, isOAuth };
+      }
     }
   } catch { /* fall through */ }
 
@@ -135,7 +162,7 @@ export function loadApiKey(provider: string, log?: LogFn): string {
     const key = entry?.key ?? entry?.token;
     if (key && key !== "proxy-handles-auth") {
       log?.(`[auth] ${provider}: using key from auth.json`);
-      return key;
+      return { key, isOAuth: false };
     }
   } catch { /* fall through */ }
 
@@ -146,12 +173,12 @@ export function loadApiKey(provider: string, log?: LogFn): string {
     const val = env?.vars?.[envKey];
     if (val) {
       log?.(`[auth] ${provider}: using key from openclaw.json env.vars`);
-      return val;
+      return { key: val, isOAuth: false };
     }
   } catch { /* fall through */ }
 
   log?.(`[auth] ${provider}: NO API KEY FOUND (checked: env ${envKey}, auth-profiles.json, auth.json, openclaw.json env.vars)`);
-  return "";
+  return { key: "", isOAuth: false };
 }
 
 // ── Provider Resolution ──────────────────────────────────────────────────────
@@ -183,10 +210,10 @@ export function resolveTierModel(tierString: string, log?: LogFn): TierModelSpec
   const provider = tierString.slice(0, slashIdx);
   const modelId = tierString.slice(slashIdx + 1);
   const baseUrl = resolveBaseUrl(provider);
-  const apiKey = loadApiKey(provider, log);
+  const { key: apiKey, isOAuth } = loadApiKey(provider, log);
   const isAnthropic = provider === "anthropic" || baseUrl.includes("anthropic.com");
 
-  return { provider, modelId, baseUrl, apiKey, isAnthropic };
+  return { provider, modelId, baseUrl, apiKey, isAnthropic, isOAuth };
 }
 
 // ── Tier Config Read/Write ───────────────────────────────────────────────────

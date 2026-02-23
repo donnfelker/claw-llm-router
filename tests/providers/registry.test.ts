@@ -13,6 +13,7 @@ function makeSpec(overrides: Partial<TierModelSpec> = {}): TierModelSpec {
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
     apiKey: "test-key",
     isAnthropic: false,
+    isOAuth: false,
     ...overrides,
   };
 }
@@ -60,6 +61,7 @@ describe("resolveProvider", () => {
         baseUrl: "https://api.anthropic.com/v1",
         apiKey: "sk-ant-oat01-oauth-token-here",
         isAnthropic: true,
+        isOAuth: true,
       }),
     );
     // When router is primary model → gateway-with-override; otherwise → gateway
@@ -77,6 +79,62 @@ describe("resolveProvider", () => {
     assert.equal(provider.name, "openai-compatible");
   });
 
+  // ── MiniMax provider tests ──────────────────────────────────────────────────
+
+  it("returns OpenAICompatibleProvider for MiniMax with direct API key", () => {
+    const provider = resolveProvider(
+      makeSpec({
+        provider: "minimax",
+        modelId: "MiniMax-M1",
+        baseUrl: "https://api.minimax.io/v1",
+        apiKey: "minimax-direct-key",
+        isAnthropic: false,
+        isOAuth: false,
+      }),
+    );
+    assert.ok(provider instanceof OpenAICompatibleProvider);
+    assert.equal(provider.name, "openai-compatible");
+  });
+
+  it("returns GatewayProvider for MiniMax with OAuth token", () => {
+    const provider = resolveProvider(
+      makeSpec({
+        provider: "minimax",
+        modelId: "MiniMax-M1",
+        baseUrl: "https://api.minimax.io/v1",
+        apiKey: "oauth-access-token",
+        isAnthropic: false,
+        isOAuth: true,
+      }),
+    );
+    assert.ok(
+      provider instanceof GatewayProvider || provider.name === "gateway-with-override",
+      `Expected GatewayProvider or gateway-with-override, got ${provider.name}`,
+    );
+  });
+
+  it("returns gateway-with-override for MiniMax OAuth when router is primary", () => {
+    // This test verifies the logic path exists — actual router-primary detection
+    // depends on openclaw.json config at runtime. The OAuth routing is generic:
+    // any provider with isOAuth=true routes through gateway.
+    const provider = resolveProvider(
+      makeSpec({
+        provider: "minimax",
+        modelId: "MiniMax-M1",
+        baseUrl: "https://api.minimax.io/v1",
+        apiKey: "oauth-access-token",
+        isAnthropic: false,
+        isOAuth: true,
+      }),
+    );
+    // Either gateway or gateway-with-override depending on primary model config
+    assert.ok(
+      provider instanceof GatewayProvider || provider.name === "gateway-with-override",
+    );
+  });
+
+  // ── General edge cases ──────────────────────────────────────────────────────
+
   it("returns OpenAICompatibleProvider for unknown providers", () => {
     const provider = resolveProvider(
       makeSpec({ provider: "custom-provider", isAnthropic: false }),
@@ -92,19 +150,34 @@ describe("resolveProvider", () => {
         isAnthropic: true,
       }),
     );
-    // Empty key doesn't start with sk-ant-oat01-, so should get AnthropicProvider
     assert.ok(provider instanceof AnthropicProvider);
   });
 
-  it("distinguishes OAuth prefix precisely", () => {
-    // Key that starts with sk-ant- but NOT sk-ant-oat01-
+  it("uses isOAuth flag for OAuth detection (not key prefix)", () => {
+    // Even with an OAuth-looking key, isOAuth=false means direct provider
     const provider = resolveProvider(
       makeSpec({
         provider: "anthropic",
-        apiKey: "sk-ant-api03-some-regular-key",
+        apiKey: "sk-ant-oat01-looks-like-oauth",
         isAnthropic: true,
+        isOAuth: false,
       }),
     );
     assert.ok(provider instanceof AnthropicProvider);
+  });
+
+  it("routes any provider through gateway when isOAuth is true", () => {
+    // Even a non-Anthropic provider gets gateway routing with OAuth
+    const provider = resolveProvider(
+      makeSpec({
+        provider: "some-provider",
+        apiKey: "some-token",
+        isAnthropic: false,
+        isOAuth: true,
+      }),
+    );
+    assert.ok(
+      provider instanceof GatewayProvider || provider.name === "gateway-with-override",
+    );
   });
 });

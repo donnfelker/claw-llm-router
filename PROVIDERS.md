@@ -9,13 +9,13 @@ The router uses a **Strategy pattern** — each provider implements the `LLMProv
 ```mermaid
 flowchart TD
     CALL[callProvider] --> RESOLVE[resolveProvider]
-    RESOLVE --> CHECK{spec.isAnthropic?}
-    CHECK -->|No| OAI[OpenAICompatibleProvider]
-    CHECK -->|Yes| OAUTH{OAuth token?}
-    OAUTH -->|No| ANT[AnthropicProvider]
+    RESOLVE --> OAUTH{spec.isOAuth?}
     OAUTH -->|Yes| PRIMARY{Router is primary?}
     PRIMARY -->|No| GW[GatewayProvider]
     PRIMARY -->|Yes| GWO[gateway-with-override]
+    OAUTH -->|No| CHECK{spec.isAnthropic?}
+    CHECK -->|Yes| ANT[AnthropicProvider]
+    CHECK -->|No| OAI[OpenAICompatibleProvider]
 ```
 
 ## The `LLMProvider` Interface
@@ -220,3 +220,6 @@ The key is passed to your provider via `spec.apiKey`. Your provider should use i
 | Fireworks | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` | `accounts/fireworks/models/llama-v3-70b` |
 | Perplexity | `https://api.perplexity.ai` | `PERPLEXITY_API_KEY` | `sonar-pro` |
 | xAI | `https://api.x.ai/v1` | `XAI_API_KEY` | `grok-3`, `grok-beta` |
+| MiniMax | `https://api.minimax.io/v1` | `MINIMAX_API_KEY` | `MiniMax-M1` |
+
+**Note:** MiniMax supports both direct API key and OAuth authentication. With OAuth (via OpenClaw auth-profiles), requests route through the gateway which handles token refresh and API format conversion. The router auto-detects OAuth credentials from the `minimax-portal` auth profile.
