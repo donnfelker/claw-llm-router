@@ -64,22 +64,23 @@ const MULTI_STEP_PATTERNS = [
 
 // ── Weights (must sum to 1.0) ─────────────────────────────────────────────────
 
+// Weights aligned with ClawRouter (14 dims), scaled to fit our 15th (agenticTask)
 const WEIGHTS: Record<string, number> = {
-  tokenCount:         0.08,
-  codePresence:       0.15,
-  reasoningMarkers:   0.18,
-  technicalTerms:     0.13,
-  creativeMarkers:    0.04,
-  simpleIndicators:   0.02,
-  multiStepPatterns:  0.10,
-  questionComplexity: 0.04,
-  imperativeVerbs:    0.05,
-  constraintCount:    0.04,
-  outputFormat:       0.03,
-  referenceComplexity:0.02,
-  negationComplexity: 0.01,
-  domainSpecificity:  0.02,
-  agenticTask:        0.06,
+  reasoningMarkers:   0.17,  // ClawRouter: 0.18
+  codePresence:       0.14,  // ClawRouter: 0.15
+  simpleIndicators:   0.11,  // ClawRouter: 0.12  (was 0.02 — key change)
+  multiStepPatterns:  0.11,  // ClawRouter: 0.12
+  technicalTerms:     0.09,  // ClawRouter: 0.10
+  tokenCount:         0.08,  // ClawRouter: 0.08
+  agenticTask:        0.06,  // ours only (not in ClawRouter)
+  creativeMarkers:    0.05,  // ClawRouter: 0.05
+  questionComplexity: 0.04,  // ClawRouter: 0.05
+  constraintCount:    0.04,  // ClawRouter: 0.04
+  imperativeVerbs:    0.03,  // ClawRouter: 0.03
+  outputFormat:       0.03,  // ClawRouter: 0.03
+  domainSpecificity:  0.02,  // ClawRouter: 0.02
+  referenceComplexity:0.02,  // ClawRouter: 0.02
+  negationComplexity: 0.01,  // ClawRouter: 0.01
 };
 
 // ── Tier boundaries ───────────────────────────────────────────────────────────
