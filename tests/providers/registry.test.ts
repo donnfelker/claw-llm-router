@@ -133,6 +133,22 @@ describe("resolveProvider", () => {
     );
   });
 
+  // ── MoonShot provider tests ──────────────────────────────────────────────────
+
+  it("returns OpenAICompatibleProvider for MoonShot", () => {
+    const provider = resolveProvider(
+      makeSpec({
+        provider: "moonshot",
+        modelId: "kimi-k2.5",
+        baseUrl: "https://api.moonshot.ai/v1",
+        isAnthropic: false,
+        isOAuth: false,
+      }),
+    );
+    assert.ok(provider instanceof OpenAICompatibleProvider);
+    assert.equal(provider.name, "openai-compatible");
+  });
+
   // ── General edge cases ──────────────────────────────────────────────────────
 
   it("returns OpenAICompatibleProvider for unknown providers", () => {

@@ -221,5 +221,6 @@ The key is passed to your provider via `spec.apiKey`. Your provider should use i
 | Perplexity | `https://api.perplexity.ai` | `PERPLEXITY_API_KEY` | `sonar-pro` |
 | xAI | `https://api.x.ai/v1` | `XAI_API_KEY` | `grok-3`, `grok-beta` |
 | MiniMax | `https://api.minimax.io/v1` | `MINIMAX_API_KEY` | `MiniMax-M1` |
+| MoonShot | `https://api.moonshot.ai/v1` | `MOONSHOT_API_KEY` | `kimi-k2.5` |
 
 **Note:** MiniMax supports both direct API key and OAuth authentication. With OAuth (via OpenClaw auth-profiles), requests route through the gateway which handles token refresh and API format conversion. The router auto-detects OAuth credentials from the `minimax-portal` auth profile.

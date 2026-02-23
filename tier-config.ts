@@ -66,6 +66,7 @@ const WELL_KNOWN_BASE_URLS: Record<string, string> = {
   perplexity: "https://api.perplexity.ai",
   xai: "https://api.x.ai/v1",
   minimax: "https://api.minimax.io/v1",
+  moonshot: "https://api.moonshot.ai/v1",
 };
 
 // Provider name → env var name mapping (when not just PROVIDER_API_KEY)
