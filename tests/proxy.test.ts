@@ -216,6 +216,79 @@ describe("Proxy Server", () => {
     });
   });
 
+  describe("Embedded system prompt stripping", () => {
+    // Mirrors proxy.ts extraction logic for non-packed-context messages
+    function extractClassifiable(userPrompt: string, systemPrompt: string): string {
+      const isPackedContext = userPrompt.startsWith("[Chat messages since")
+        || userPrompt.startsWith("[chat messages since");
+      let classifiablePrompt = userPrompt;
+
+      if (isPackedContext) {
+        const marker = "[Current message - respond to this]";
+        const markerIdx = userPrompt.indexOf(marker);
+        if (markerIdx !== -1) {
+          classifiablePrompt = userPrompt.slice(markerIdx + marker.length).trim();
+        }
+      } else if (systemPrompt && userPrompt.length > systemPrompt.length) {
+        const sysIdx = userPrompt.indexOf(systemPrompt);
+        if (sysIdx !== -1) {
+          const stripped = (
+            userPrompt.slice(0, sysIdx) + userPrompt.slice(sysIdx + systemPrompt.length)
+          ).trim();
+          if (stripped) classifiablePrompt = stripped;
+        }
+      } else if (!systemPrompt && userPrompt.length > 500) {
+        const lastBreak = userPrompt.lastIndexOf("\n\n");
+        if (lastBreak !== -1) {
+          const tail = userPrompt.slice(lastBreak).trim();
+          if (tail && tail.length < 500) {
+            classifiablePrompt = tail;
+          }
+        }
+      }
+      return classifiablePrompt;
+    }
+
+    it("strips embedded system prompt from user message", () => {
+      const sysPrompt = "You are Cato, a helpful assistant.\n\nRespond with ```json blocks when appropriate.";
+      const userMsg = sysPrompt + "\n\n3+1";
+      const extracted = extractClassifiable(userMsg, sysPrompt);
+      assert.equal(extracted, "3+1");
+    });
+
+    it("classifies SIMPLE after stripping system prompt with code/json keywords", () => {
+      const sysPrompt = "You are a helpful AI assistant.\n\n## Response Format\nUse ```json or ```python blocks.\nAlways structure output as json when appropriate.";
+      const userMsg = sysPrompt + "\n\n3+1";
+
+      const extracted = extractClassifiable(userMsg, sysPrompt);
+      const fullResult = classify(userMsg);
+      const extractedResult = classify(extracted);
+
+      assert.equal(extractedResult.tier, "SIMPLE", "Should classify as SIMPLE after stripping system prompt");
+      assert.notEqual(fullResult.tier, "SIMPLE", "Full text with system prompt should NOT be SIMPLE");
+    });
+
+    it("falls back to last paragraph when no separate system prompt and message is long", () => {
+      // Simulate: system prompt embedded in user message with no separate system-role message
+      const embeddedSysPrompt = "You are Cato.\n\n## Tools\nUse exec and read tools for code.\n\n## Format\nUse ```json blocks.\n\n".padEnd(600, "x");
+      const userMsg = embeddedSysPrompt + "\n\nWhat is 2+2?";
+      const extracted = extractClassifiable(userMsg, ""); // empty system prompt
+      assert.equal(extracted, "What is 2+2?");
+    });
+
+    it("does not strip when user message is short (no embedded system prompt)", () => {
+      const extracted = extractClassifiable("3+1", "You are a helpful assistant.");
+      assert.equal(extracted, "3+1", "Short user messages should not be modified");
+    });
+
+    it("does not strip when system prompt is not found in user message", () => {
+      const sysPrompt = "You are a helpful assistant.";
+      const userMsg = "Tell me about kubernetes architecture and distributed systems.";
+      const extracted = extractClassifiable(userMsg, sysPrompt);
+      assert.equal(extracted, userMsg, "Should not modify when system prompt is not embedded");
+    });
+  });
+
   describe("Fallback chain behavior", () => {
     it("tries tiers in order and stops on success", () => {
       const chain = ["SIMPLE", "MEDIUM", "COMPLEX"];

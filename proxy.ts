@@ -57,22 +57,45 @@ async function handleChatCompletion(
   const userPrompt = extractUserPrompt(messages);
   const systemPrompt = extractSystemPrompt(messages);
 
-  // OpenClaw packs conversation history + current message into a single user message
-  // for group chats and subagent requests. Format:
-  //   [Chat messages since your last reply - for context]
-  //   ...history...
-  //   [Current message - respond to this]
-  //   ...actual user prompt...
-  // Extract the current message and classify it instead of defaulting to MEDIUM.
+  // ── Extract classifiable prompt ──────────────────────────────────────────
+  // The user message may contain more than just the user's input:
+  //  1. Packed context (group chats / subagents): history + current message
+  //  2. Embedded system prompt: system instructions prepended to user text
+  // We need to isolate the actual user text for accurate classification.
+
   const isPackedContext = userPrompt.startsWith("[Chat messages since")
     || userPrompt.startsWith("[chat messages since");
 
   let classifiablePrompt = userPrompt;
+
   if (isPackedContext) {
+    // Case 1: Packed context — extract text after the current-message marker
     const marker = "[Current message - respond to this]";
     const markerIdx = userPrompt.indexOf(marker);
     if (markerIdx !== -1) {
       classifiablePrompt = userPrompt.slice(markerIdx + marker.length).trim();
+    }
+  } else if (systemPrompt && userPrompt.length > systemPrompt.length) {
+    // Case 2: System prompt embedded in user message — strip it
+    // Some paths (e.g. webchat) prepend the system prompt to the user message
+    // instead of sending it as a separate system-role message.
+    const sysIdx = userPrompt.indexOf(systemPrompt);
+    if (sysIdx !== -1) {
+      const stripped = (
+        userPrompt.slice(0, sysIdx) + userPrompt.slice(sysIdx + systemPrompt.length)
+      ).trim();
+      if (stripped) classifiablePrompt = stripped;
+    }
+  } else if (!systemPrompt && userPrompt.length > 500) {
+    // Case 3: No separate system message and user message is suspiciously long.
+    // The system prompt is likely embedded. The actual user text is at the end,
+    // after the last paragraph break.
+    const lastBreak = userPrompt.lastIndexOf("\n\n");
+    if (lastBreak !== -1) {
+      const tail = userPrompt.slice(lastBreak).trim();
+      if (tail && tail.length < 500) {
+        classifiablePrompt = tail;
+      }
     }
   }
 
@@ -89,9 +112,11 @@ async function handleChatCompletion(
   } else {
     const result = classify(classifiablePrompt);
     tier = result.tier;
-    const packedNote = isPackedContext ? " (extracted from packed context)" : "";
+    const extractionNote = classifiablePrompt !== userPrompt
+      ? ` (extracted ${classifiablePrompt.length} chars from ${userPrompt.length}-char message)`
+      : "";
     log.info(
-      `Classified tier=${tier} score=${result.score.toFixed(3)} conf=${result.confidence.toFixed(2)} signals=[${result.signals.slice(0, 3).join(", ")}]${packedNote}`,
+      `Classified tier=${tier} score=${result.score.toFixed(3)} conf=${result.confidence.toFixed(2)} signals=[${result.signals.slice(0, 3).join(", ")}]${extractionNote}`,
     );
 
     // Hybrid classifier: if rule-based confidence is low, ask a cheap LLM
