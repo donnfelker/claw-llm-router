@@ -155,7 +155,35 @@ The router reads API keys from OpenClaw's existing auth stores (never stores its
 
 ## Usage
 
-### Via OpenClaw
+### `/router` Command
+
+The `/router` slash command manages the router from any OpenClaw chat. No gateway restart needed for tier changes — they take effect on the next request.
+
+| Command | What It Does |
+|---------|-------------|
+| `/router` | Show status: uptime, proxy health, current tier assignments |
+| `/router help` | List all subcommands with examples |
+| `/router setup` | Show current config with suggested models per tier |
+| `/router set <TIER> <provider/model>` | Change a tier's model |
+| `/router doctor` | Diagnose config, API keys, base URLs, and proxy health |
+
+Common workflows:
+
+```
+# Check what's running
+/router
+
+# Something broken? Run the doctor
+/router doctor
+
+# Swap SIMPLE tier to a different model
+/router set SIMPLE groq/llama-3.3-70b-versatile
+
+# See all options and suggested models
+/router setup
+```
+
+### Model Selection
 
 Switch to the router model in any chat:
 
@@ -163,11 +191,12 @@ Switch to the router model in any chat:
 /model claw-llm-router/auto
 ```
 
-Or force a specific tier:
+Or force a specific tier (useful for testing or when you know the complexity):
 
 ```
-/model claw-llm-router/simple
-/model claw-llm-router/complex
+/model claw-llm-router/simple      # Always use the cheapest model
+/model claw-llm-router/complex     # Skip classification, go straight to capable
+/model claw-llm-router/reasoning   # Force frontier reasoning model
 ```
 
 ### Via curl
