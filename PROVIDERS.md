@@ -206,3 +206,17 @@ The key is passed to your provider via `spec.apiKey`. Your provider should use i
 | `AnthropicProvider` | `anthropic.ts` | `x-api-key` | Anthropic Messages | Full format conversion (request + response + streaming) |
 | `GatewayProvider` | `gateway.ts` | `Authorization: Bearer` (gateway token) | OpenAI | Fallback for OAuth tokens |
 | `gateway-with-override` | `index.ts` (inline) | Same as Gateway | OpenAI | Sets `before_model_resolve` override to prevent recursion |
+
+### Supported OpenAI-Compatible Providers
+
+| Provider | Base URL | Env Var | Example Models |
+|----------|----------|---------|----------------|
+| Google | `https://generativelanguage.googleapis.com/v1beta/openai` | `GEMINI_API_KEY` | `gemini-2.5-flash` |
+| OpenAI | `https://api.openai.com/v1` | `OPENAI_API_KEY` | `gpt-4o`, `gpt-4o-mini` |
+| Groq | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` | `llama-3.3-70b-versatile` |
+| Mistral | `https://api.mistral.ai/v1` | `MISTRAL_API_KEY` | `mistral-large-latest` |
+| DeepSeek | `https://api.deepseek.com/v1` | `DEEPSEEK_API_KEY` | `deepseek-chat` |
+| Together | `https://api.together.xyz/v1` | `TOGETHER_API_KEY` | `meta-llama/Llama-3-70b` |
+| Fireworks | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` | `accounts/fireworks/models/llama-v3-70b` |
+| Perplexity | `https://api.perplexity.ai` | `PERPLEXITY_API_KEY` | `sonar-pro` |
+| xAI | `https://api.x.ai/v1` | `XAI_API_KEY` | `grok-3`, `grok-beta` |

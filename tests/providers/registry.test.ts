@@ -69,6 +69,14 @@ describe("resolveProvider", () => {
     );
   });
 
+  it("returns OpenAICompatibleProvider for xAI", () => {
+    const provider = resolveProvider(
+      makeSpec({ provider: "xai", baseUrl: "https://api.x.ai/v1", isAnthropic: false }),
+    );
+    assert.ok(provider instanceof OpenAICompatibleProvider);
+    assert.equal(provider.name, "openai-compatible");
+  });
+
   it("returns OpenAICompatibleProvider for unknown providers", () => {
     const provider = resolveProvider(
       makeSpec({ provider: "custom-provider", isAnthropic: false }),

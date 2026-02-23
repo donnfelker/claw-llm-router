@@ -96,6 +96,7 @@ flowchart LR
     OAI -->|Direct API| GOOGLE[Google Gemini]
     OAI -->|Direct API| OPENAI[OpenAI]
     OAI -->|Direct API| GROQ[Groq]
+    OAI -->|Direct API| XAI[xAI Grok]
     ANT -->|Direct API| ANTAPI[Anthropic API]
     GW -->|Via Gateway| GWSVC[OpenClaw Gateway]
     GWO -->|Via Gateway<br/>+ model override hook| GWSVC
@@ -227,7 +228,7 @@ Then restart the gateway. The router handles OAuth tokens automatically via the 
 
 The router reads API keys from OpenClaw's existing auth stores (never stores its own). Priority order:
 
-1. Environment variable (e.g., `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`)
+1. Environment variable (e.g., `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`)
 2. `~/.openclaw/agents/main/agent/auth-profiles.json`
 3. `~/.openclaw/agents/main/agent/auth.json`
 4. `~/.openclaw/openclaw.json` `env.vars` section
