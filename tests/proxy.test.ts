@@ -4,6 +4,7 @@ import http from "node:http";
 import { classify } from "../classifier.js";
 import { handleDoctorCommand } from "../index.js";
 import { getTierStrings, writeTierConfig } from "../tier-config.js";
+import { MissingApiKeyError } from "../providers/index.js";
 
 // We test the proxy by starting it on a random port and making real HTTP requests.
 // Provider calls are mocked via globalThis.fetch.
@@ -349,6 +350,65 @@ describe("Proxy Server", () => {
 
       assert.deepEqual(results, chain);
     });
+  });
+});
+
+describe("Missing API key error handling", () => {
+  it("allMissingKeys flag produces setup-oriented error when all tiers have no key", () => {
+    // Simulates the proxy fallback loop logic when all errors are MissingApiKeyError
+    const errors: Error[] = [
+      new MissingApiKeyError("google", "gemini-2.5-flash", "GEMINI_API_KEY"),
+      new MissingApiKeyError("anthropic", "claude-haiku-4-5-20251001", "ANTHROPIC_API_KEY"),
+      new MissingApiKeyError("anthropic", "claude-sonnet-4-6", "ANTHROPIC_API_KEY"),
+    ];
+
+    let allMissingKeys = true;
+    let lastError: Error | undefined;
+    for (const err of errors) {
+      lastError = err;
+      if (!(err instanceof MissingApiKeyError)) allMissingKeys = false;
+    }
+
+    assert.ok(allMissingKeys, "All errors should be MissingApiKeyError");
+    const message = allMissingKeys
+      ? `No API keys configured. Run /router doctor to see what's needed, or set API keys for your providers (e.g. GEMINI_API_KEY, ANTHROPIC_API_KEY). See: https://github.com/anthropics/claw-llm-router#setup`
+      : `All providers failed: ${lastError?.message}`;
+
+    assert.ok(message.includes("No API keys configured"));
+    assert.ok(message.includes("/router doctor"));
+    assert.ok(message.includes("GEMINI_API_KEY"));
+  });
+
+  it("allMissingKeys flag is false when at least one error is not MissingApiKeyError", () => {
+    const errors: Error[] = [
+      new MissingApiKeyError("google", "gemini-2.5-flash", "GEMINI_API_KEY"),
+      new Error("Connection refused"),  // non-key error
+    ];
+
+    let allMissingKeys = true;
+    let lastError: Error | undefined;
+    for (const err of errors) {
+      lastError = err;
+      if (!(err instanceof MissingApiKeyError)) allMissingKeys = false;
+    }
+
+    assert.ok(!allMissingKeys, "Should not be all missing keys when there's a network error");
+    const message = allMissingKeys
+      ? `No API keys configured.`
+      : `All providers failed: ${lastError?.message}`;
+
+    assert.ok(message.includes("All providers failed"));
+    assert.ok(message.includes("Connection refused"));
+  });
+
+  it("MissingApiKeyError has correct properties", () => {
+    const err = new MissingApiKeyError("anthropic", "claude-sonnet-4-6", "ANTHROPIC_API_KEY");
+    assert.equal(err.name, "MissingApiKeyError");
+    assert.equal(err.provider, "anthropic");
+    assert.equal(err.modelId, "claude-sonnet-4-6");
+    assert.equal(err.envVar, "ANTHROPIC_API_KEY");
+    assert.ok(err instanceof Error);
+    assert.ok(err instanceof MissingApiKeyError);
   });
 });
 

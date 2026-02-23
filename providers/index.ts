@@ -14,6 +14,7 @@ import { readFileSync } from "node:fs";
 import type { ServerResponse } from "node:http";
 import type { LLMProvider, PluginLogger } from "./types.js";
 import type { TierModelSpec } from "../tier-config.js";
+import { envVarName } from "../tier-config.js";
 import { OpenAICompatibleProvider } from "./openai-compatible.js";
 import { AnthropicProvider } from "./anthropic.js";
 import { GatewayProvider } from "./gateway.js";
@@ -80,6 +81,24 @@ const gatewayOverrideProvider: LLMProvider = {
   },
 };
 
+export class MissingApiKeyError extends Error {
+  public readonly provider: string;
+  public readonly modelId: string;
+  public readonly envVar: string;
+
+  constructor(provider: string, modelId: string, envVar: string) {
+    super(
+      `No API key for ${provider}/${modelId}. ` +
+      `Set ${envVar} or run /auth to add ${provider} credentials. ` +
+      `Details: /router doctor`
+    );
+    this.name = "MissingApiKeyError";
+    this.provider = provider;
+    this.modelId = modelId;
+    this.envVar = envVar;
+  }
+}
+
 export function resolveProvider(spec: TierModelSpec): LLMProvider {
   // Any provider with OAuth credentials → route through gateway
   // (gateway handles token refresh and API format conversion)
@@ -102,6 +121,9 @@ export async function callProvider(
   res: ServerResponse,
   log: PluginLogger,
 ): Promise<void> {
+  if (!spec.apiKey) {
+    throw new MissingApiKeyError(spec.provider, spec.modelId, envVarName(spec.provider));
+  }
   const rlog = new RouterLogger(log);
   const provider = resolveProvider(spec);
   rlog.provider({ name: provider.name, provider: spec.provider, model: spec.modelId });

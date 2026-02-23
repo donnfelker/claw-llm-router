@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { resolveProvider } from "../../providers/index.js";
+import { resolveProvider, callProvider, MissingApiKeyError } from "../../providers/index.js";
 import { OpenAICompatibleProvider } from "../../providers/openai-compatible.js";
 import { AnthropicProvider } from "../../providers/anthropic.js";
 import { GatewayProvider } from "../../providers/gateway.js";
@@ -182,6 +182,44 @@ describe("resolveProvider", () => {
     assert.ok(
       provider instanceof GatewayProvider || provider.name === "gateway-with-override",
     );
+  });
+
+  // ── MissingApiKeyError: fail-fast when apiKey is empty ──────────────────────
+
+  it("throws MissingApiKeyError when apiKey is empty", async () => {
+    const spec = makeSpec({ provider: "google", modelId: "gemini-2.5-flash", apiKey: "" });
+    const res = { headersSent: false, writableEnded: false } as import("node:http").ServerResponse;
+    const log = { info: () => {}, warn: () => {}, error: () => {} };
+
+    await assert.rejects(
+      () => callProvider(spec, { messages: [] }, false, res, log),
+      (err: unknown) => {
+        assert.ok(err instanceof MissingApiKeyError);
+        assert.equal(err.provider, "google");
+        assert.equal(err.modelId, "gemini-2.5-flash");
+        assert.equal(err.envVar, "GEMINI_API_KEY");
+        assert.ok(err.message.includes("google/gemini-2.5-flash"));
+        assert.ok(err.message.includes("GEMINI_API_KEY"));
+        assert.ok(err.message.includes("/router doctor"));
+        return true;
+      },
+    );
+  });
+
+  it("does not throw MissingApiKeyError when apiKey is present", async () => {
+    // callProvider will proceed to resolveProvider and attempt the actual provider call.
+    // We just verify it does NOT throw MissingApiKeyError — it will throw something
+    // else (network error) since there's no real server.
+    const spec = makeSpec({ provider: "google", apiKey: "test-key" });
+    const res = { headersSent: false, writableEnded: false } as import("node:http").ServerResponse;
+    const log = { info: () => {}, warn: () => {}, error: () => {} };
+
+    try {
+      await callProvider(spec, { messages: [] }, false, res, log);
+    } catch (err) {
+      // Should NOT be a MissingApiKeyError
+      assert.ok(!(err instanceof MissingApiKeyError), "Should not throw MissingApiKeyError when key is present");
+    }
   });
 
   // ── Regression: OAuth tokens must never hit AnthropicProvider ──────────────

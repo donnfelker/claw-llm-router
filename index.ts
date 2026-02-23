@@ -207,6 +207,33 @@ function injectAuthProfile(log: PluginLogger): void {
   }
 }
 
+// ── Startup API key warnings ─────────────────────────────────────────────────
+
+function logApiKeyWarnings(log: PluginLogger): void {
+  const tiers = getTierStrings();
+  const tierNames = ["SIMPLE", "MEDIUM", "COMPLEX", "REASONING"] as const;
+  const missing: string[] = [];
+
+  for (const tier of tierNames) {
+    const modelStr = tiers[tier];
+    const slashIdx = modelStr.indexOf("/");
+    if (slashIdx <= 0) continue;
+    const provider = modelStr.slice(0, slashIdx);
+    const { key } = loadApiKey(provider);
+    if (!key) {
+      missing.push(`${tier} (${modelStr}) — set ${envVarName(provider)} or run /auth`);
+    }
+  }
+
+  if (missing.length > 0) {
+    log.warn(`${LOG_PREFIX} ⚠ Missing API keys for ${missing.length} tier(s):`);
+    for (const line of missing) {
+      log.warn(`${LOG_PREFIX}   ${line}`);
+    }
+    log.warn(`${LOG_PREFIX}   Run /router doctor for full diagnostics`);
+  }
+}
+
 // ── /router command handlers ─────────────────────────────────────────────────
 
 const TIER_SUGGESTIONS: Record<string, string> = {
@@ -446,6 +473,9 @@ export default {
       writeTierConfig(DEFAULT_TIERS);
       log.info(`${LOG_PREFIX} First run: default tier config written. Use /router setup to customize.`);
     }
+
+    // 5b. Warn about missing API keys (non-blocking)
+    logApiKeyWarnings(log);
 
     // 6. Register service (manages proxy lifecycle with gateway)
     api.registerService({

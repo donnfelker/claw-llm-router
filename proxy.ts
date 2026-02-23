@@ -13,7 +13,7 @@ import { createServer, type Server, type IncomingMessage, type ServerResponse } 
 import { classify, tierFromModelId, FALLBACK_CHAIN, type Tier } from "./classifier.js";
 import { PROXY_PORT } from "./models.js";
 import { loadTierConfig } from "./tier-config.js";
-import { callProvider } from "./providers/index.js";
+import { callProvider, MissingApiKeyError } from "./providers/index.js";
 import type { PluginLogger, ChatMessage } from "./providers/types.js";
 import { RouterLogger } from "./router-logger.js";
 
@@ -159,6 +159,8 @@ async function handleChatCompletion(
   });
 
   let lastError: Error | undefined;
+  let allMissingKeys = true;
+
   for (const attemptTier of chain) {
     const spec = tierConfig[attemptTier];
     try {
@@ -166,6 +168,7 @@ async function handleChatCompletion(
       return; // success
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
+      if (!(err instanceof MissingApiKeyError)) allMissingKeys = false;
       rlog.fallback({ tier: attemptTier, provider: spec.provider, model: spec.modelId, error: lastError.message });
     }
   }
@@ -175,8 +178,11 @@ async function handleChatCompletion(
     res.writeHead(502, { "Content-Type": "application/json" });
   }
   if (!res.writableEnded) {
+    const message = allMissingKeys
+      ? `No API keys configured. Run /router doctor to see what's needed, or set API keys for your providers (e.g. GEMINI_API_KEY, ANTHROPIC_API_KEY). See: https://github.com/anthropics/claw-llm-router#setup`
+      : `All providers failed: ${lastError?.message}`;
     res.end(JSON.stringify({
-      error: { message: `All providers failed: ${lastError?.message}`, type: "router_error" },
+      error: { message, type: "router_error" },
     }));
   }
 }

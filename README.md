@@ -79,16 +79,11 @@ REASONING → (no fallback)
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for provider strategy, resolution logic, and the OAuth model override mechanism.
 
-## Setup
+## Quickstart
 
-### Prerequisites
+### 1. Install the plugin
 
-- [OpenClaw](https://openclaw.ai) installed and running
-- At least one LLM provider API key configured
-
-### Install
-
-Copy the plugin to your OpenClaw extensions directory:
+Copy to your OpenClaw extensions directory:
 
 ```bash
 cp -r claw-llm-router ~/.openclaw/extensions/
@@ -107,11 +102,51 @@ Enable it in `~/.openclaw/openclaw.json`:
 }
 ```
 
-Restart the gateway:
+### 2. Set up API keys
+
+The router needs at least one provider API key. Set keys for the providers you want to use:
+
+| Provider | Environment Variable | Tier Suggestion |
+|----------|---------------------|----------------|
+| Google | `GEMINI_API_KEY` | SIMPLE |
+| Anthropic | `ANTHROPIC_API_KEY` or OAuth via `/auth` | MEDIUM, COMPLEX, REASONING |
+| OpenAI | `OPENAI_API_KEY` | MEDIUM, COMPLEX |
+| Groq | `GROQ_API_KEY` | SIMPLE |
+| xAI | `XAI_API_KEY` | MEDIUM |
+
+You can also add credentials through OpenClaw's `/auth` command.
+
+> **Tip:** At minimum, set `GEMINI_API_KEY` for the SIMPLE tier and authenticate Anthropic via `/auth` for the other tiers. This covers all four tiers.
+
+### 3. Restart and verify
 
 ```bash
 openclaw gateway restart
 ```
+
+Then run the doctor to verify everything is working:
+
+```
+/router doctor
+```
+
+### 4. Set as primary model (recommended)
+
+To route all prompts through the router automatically, set it as the primary model in `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "claw-llm-router/auto"
+      }
+    }
+  }
+}
+```
+
+Restart the gateway after this change.
 
 ### Configure Tiers
 
@@ -126,25 +161,7 @@ Use the `/router` command in any OpenClaw chat:
 /router doctor             # Diagnose config, auth, and proxy issues
 ```
 
-### Set as Primary Model
-
-To use the router for all prompts, set it as the primary model in `~/.openclaw/openclaw.json`:
-
-```json
-{
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "claw-llm-router/auto"
-      }
-    }
-  }
-}
-```
-
-Then restart the gateway. The router handles OAuth tokens automatically via the model override mechanism.
-
-### API Keys
+### API Key Resolution
 
 The router reads API keys from OpenClaw's existing auth stores (never stores its own). Priority order:
 
