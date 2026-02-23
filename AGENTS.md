@@ -27,6 +27,7 @@ OpenClaw sends chat completion requests to the router, which classifies the prom
 ├── models.ts                 # Model definitions, port/provider constants
 ├── provider.ts               # OpenClaw provider plugin definition
 ├── router-config.json        # Tier configuration (auto-generated, do not edit manually)
+├── router-logger.ts          # RouterLogger class — centralized [router] log formatting
 ├── providers/
 │   ├── types.ts              # LLMProvider interface, PluginLogger, ChatMessage
 │   ├── openai-compatible.ts  # Google, OpenAI, Groq, Mistral, DeepSeek, etc.
@@ -34,6 +35,9 @@ OpenClaw sends chat completion requests to the router, which classifies the prom
 │   ├── gateway.ts            # OpenClaw gateway fallback (OAuth tokens)
 │   ├── model-override.ts     # In-process override store (prevents recursion)
 │   └── index.ts              # Provider registry, resolveProvider(), callProvider()
+├── docs/
+│   ├── PROVIDERS.md          # Step-by-step guide for adding new providers
+│   └── CLASSIFIER.md         # Classifier architecture, dimensions, weights, extraction
 └── tests/
 ```
 
@@ -47,9 +51,18 @@ OpenClaw sends chat completion requests to the router, which classifies the prom
 - `setInterval` calls must use `.unref()` to avoid hanging test processes
 - `OpenAICompatibleProvider` strips non-standard request fields (e.g., `store`) to avoid 400 errors
 
+## Docs
+
+Documentation lives in the `docs/` folder. **Keep docs in sync with code changes:**
+
+- **`docs/PROVIDERS.md`** — When adding, removing, or changing a provider implementation, update the provider tables, auth info, and step-by-step guide.
+- **`docs/CLASSIFIER.md`** — When changing classifier dimensions, weights, tier boundaries, confidence thresholds, extraction logic, or the LLM classifier, update the corresponding sections.
+
+If you change code that is documented in `docs/`, update the docs in the same commit.
+
 ## Adding a New Provider
 
-Most new providers are OpenAI-compatible and only require config changes (base URL, env var, tier suggestions). Providers with non-standard APIs or OAuth need additional work. Read `PROVIDERS.md` for the full step-by-step guide including:
+Most new providers are OpenAI-compatible and only require config changes (base URL, env var, tier suggestions). Providers with non-standard APIs or OAuth need additional work. Read `docs/PROVIDERS.md` for the full step-by-step guide including:
 
 - The `LLMProvider` interface contract
 - How to add well-known base URLs and env var mappings
