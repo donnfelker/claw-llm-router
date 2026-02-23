@@ -40,7 +40,6 @@ export type TierConfig = Record<Tier, TierModelSpec>;
 
 type RouterConfig = {
   tiers: Record<Tier, string>;
-  classifierModel?: string;
 };
 
 // ── Defaults ─────────────────────────────────────────────────────────────────
@@ -104,7 +103,7 @@ function writeRouterConfigFile(config: RouterConfig): void {
   renameSync(tmp, ROUTER_CONFIG_PATH);
 }
 
-function envVarName(provider: string): string {
+export function envVarName(provider: string): string {
   return ENV_VAR_OVERRIDES[provider] ?? `${provider.toUpperCase()}_API_KEY`;
 }
 
@@ -267,23 +266,5 @@ export function writeTierConfig(tiers: Record<Tier, string>): void {
   writeRouterConfigFile({
     ...existing,
     tiers,
-  });
-}
-
-// ── Classifier Model ─────────────────────────────────────────────────────────
-
-export function getClassifierModelSpec(log?: LogFn): TierModelSpec {
-  const config = readRouterConfig();
-  const classifierModel = config?.classifierModel;
-  // Default to SIMPLE tier model (cheapest)
-  const modelString = classifierModel ?? getTierStrings().SIMPLE;
-  return resolveTierModel(modelString, log);
-}
-
-export function writeClassifierModel(modelString: string): void {
-  const existing = readRouterConfig() ?? { tiers: DEFAULT_TIERS };
-  writeRouterConfigFile({
-    ...existing,
-    classifierModel: modelString,
   });
 }

@@ -2,13 +2,13 @@
  * Claw LLM Router — Structured Router Logger
  *
  * Wraps PluginLogger with domain-specific methods for each phase of the
- * routing pipeline. All output is prefixed with [router] for easy filtering.
+ * routing pipeline. All output is prefixed with [claw-llm-router] for easy filtering.
  */
 
 import type { PluginLogger } from "./providers/types.js";
 import type { Tier } from "./classifier.js";
 
-const PREFIX = "[router]";
+const PREFIX = "[claw-llm-router]";
 
 export class RouterLogger {
   constructor(private log: PluginLogger) {}
@@ -42,20 +42,6 @@ export class RouterLogger {
     if (opts.signals?.length) parts.push(`signals=[${opts.signals.join(", ")}]`);
     if (opts.detail) parts.push(opts.detail);
     this.log.info(`${PREFIX} classify: ${parts.join(" ")}`);
-  }
-
-  /** LLM classifier override (low confidence → asked a cheap LLM) */
-  llmOverride(opts: {
-    from: Tier;
-    to: Tier;
-    ruleConf: number;
-  }): void {
-    this.log.info(`${PREFIX} classify: tier=${opts.from} → ${opts.to} method=llm-override (rule-based conf=${opts.ruleConf.toFixed(2)} was below threshold)`);
-  }
-
-  /** LLM classifier skipped or failed */
-  llmFallback(reason: string): void {
-    this.log.warn(`${PREFIX} classify: llm-classifier ${reason} → falling back to MEDIUM`);
   }
 
   /** Routing decision: which provider/model was selected */

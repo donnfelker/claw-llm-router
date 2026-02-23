@@ -8,19 +8,25 @@ The classifier determines which tier (SIMPLE, MEDIUM, COMPLEX, REASONING) a user
 User prompt
     │
     ▼
-┌──────────────────┐     score < 0.70 conf     ┌──────────────────┐
-│  Rule-based       │ ─────────────────────────▶│  LLM classifier   │
-│  (15 dimensions)  │                           │  (cheap model)    │
-└──────────────────┘                           └──────────────────┘
-    │ high confidence                               │
-    ▼                                               ▼
-  Tier assigned                                   Tier assigned
+┌──────────────────┐
+│  Rule-based       │
+│  (15 dimensions)  │
+└──────────────────┘
+    │
+    ▼
+  Tier assigned
 ```
 
-Two classifiers work together:
+The classifier is 100% local — 15-dimension weighted scoring that runs in <1ms with no API calls. Ambiguous prompts (near tier boundaries) default to the rule-based result rather than calling an external LLM, because the MEDIUM tier is cheap enough to be a safe default.
 
-1. **Rule-based** (`classifier.ts`) — 15-dimension weighted scoring, runs locally in <1ms, no API calls
-2. **LLM-based** (`llm-classifier.ts`) — called only when rule-based confidence is below 0.70, uses the cheapest configured model
+### Why no LLM fallback?
+
+An earlier version used a hybrid approach: when rule-based confidence was below 0.70, it called a cheap LLM to verify. This was removed because:
+
+1. **Net cost increase**: The LLM classifier correctly downgraded ~35% of ambiguous prompts to SIMPLE (saving ~$0.004 each), but upgraded ~25% to COMPLEX/REASONING (costing ~$0.03-0.04 each). The upgrades dominated, making the classifier a net cost of $3.50-$74/month depending on traffic.
+2. **Latency**: Added 100-500ms per LLM call on ~33% of messages.
+3. **ClawRouter precedent**: ClawRouter uses 100% local classification with no LLM fallback and reports 70-80% cost savings. The savings come from the non-ambiguous prompts (both approaches classify these identically).
+4. **MEDIUM is a safe default**: Cheap enough to not waste money, capable enough to handle most tasks.
 
 ## Rule-Based Classifier
 
@@ -52,12 +58,14 @@ Weights sum to 1.0 and are aligned with [ClawRouter](https://github.com/claw-pro
 
 The weighted sum maps to a tier via fixed boundaries:
 
-| Score range | Tier |
-|-------------|------|
-| < 0.00 | SIMPLE |
-| 0.00 – 0.15 | MEDIUM |
-| 0.15 – 0.35 | COMPLEX |
-| >= 0.35 | REASONING |
+| Score range | Tier | Band width |
+|-------------|------|------------|
+| < 0.00 | SIMPLE | — |
+| 0.00 – 0.30 | MEDIUM | 0.30 |
+| 0.30 – 0.50 | COMPLEX | 0.20 |
+| >= 0.50 | REASONING | — |
+
+These boundaries match [ClawRouter](https://github.com/claw-project/claw-router)'s production-proven values. The MEDIUM band is intentionally wide (0.30) so that ambiguous prompts — which tend to cluster around boundaries — land confidently within MEDIUM rather than triggering expensive misrouting. With steepness=12.0, a score at the center of MEDIUM (0.15) has distance 0.15 to the nearest boundary, yielding confidence ~0.86.
 
 ### Special Overrides
 
@@ -78,8 +86,7 @@ confidence = sigmoid(distance_to_nearest_boundary)
 sigmoid(x) = 1 / (1 + exp(-12.0 * x))
 ```
 
-- **High confidence** (>0.70): the score is well within a tier — rule-based result is used directly
-- **Low confidence** (<0.70): the score is near a boundary — triggers the LLM classifier for verification
+Higher confidence means the score is well within a tier's range. Lower confidence means it's near a boundary. Either way, the rule-based tier is used directly.
 
 ### Signals
 
@@ -89,38 +96,8 @@ The classifier returns human-readable signal strings that explain why it chose a
 - `simple (what is)` — matched a simple-indicator keyword
 - `code (function, class)` — matched code keywords
 - `reasoning (step by step, prove)` — matched reasoning markers
-- `ambiguous (conf=0.58) → needs LLM classification` — confidence too low
 
 These signals appear in the router logs for debugging.
-
-## LLM Classifier
-
-When the rule-based classifier's confidence is below 0.70, the hybrid system calls a cheap LLM to verify the classification.
-
-### How it works
-
-1. The user prompt is truncated to 500 characters
-2. A system prompt asks the LLM to respond with exactly one tier name: `SIMPLE`, `MEDIUM`, `COMPLEX`, or `REASONING`
-3. The response is parsed — exact match preferred, substring extraction as fallback
-4. If the LLM returns an invalid response, falls back to `MEDIUM`
-
-### Configuration
-
-The classifier model defaults to whatever the SIMPLE tier is set to (cheapest model). Override with:
-
-```
-/router classifier google/gemini-2.5-flash
-```
-
-### Failure modes
-
-| Scenario | Behavior |
-|----------|----------|
-| No API key for classifier model | Skips LLM, falls back to MEDIUM |
-| LLM call fails (timeout, error) | Falls back to MEDIUM |
-| LLM returns invalid tier | Falls back to MEDIUM |
-| LLM confirms rule-based result | Uses LLM result (same tier) |
-| LLM overrides rule-based result | Uses LLM result (different tier) |
 
 ## Prompt Extraction
 

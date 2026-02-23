@@ -137,37 +137,6 @@ describe("RouterLogger", () => {
     });
   });
 
-  // ── llmOverride() ─────────────────────────────────────────────────────────
-
-  describe("llmOverride()", () => {
-    it("logs tier transition and rule confidence", () => {
-      const { messages, log } = makeCapture();
-      const rlog = new RouterLogger(log);
-      rlog.llmOverride({ from: "MEDIUM", to: "COMPLEX", ruleConf: 0.65 });
-
-      assert.ok(messages[0].msg.includes("[router] classify:"));
-      assert.ok(messages[0].msg.includes("tier=MEDIUM"));
-      assert.ok(messages[0].msg.includes("COMPLEX"));
-      assert.ok(messages[0].msg.includes("method=llm-override"));
-      assert.ok(messages[0].msg.includes("conf=0.65"));
-    });
-  });
-
-  // ── llmFallback() ─────────────────────────────────────────────────────────
-
-  describe("llmFallback()", () => {
-    it("logs warning with reason and MEDIUM fallback", () => {
-      const { messages, log } = makeCapture();
-      const rlog = new RouterLogger(log);
-      rlog.llmFallback("skipped (no API key for google)");
-
-      assert.equal(messages[0].level, "warn");
-      assert.ok(messages[0].msg.includes("[router] classify:"));
-      assert.ok(messages[0].msg.includes("llm-classifier skipped (no API key for google)"));
-      assert.ok(messages[0].msg.includes("falling back to MEDIUM"));
-    });
-  });
-
   // ── route() ───────────────────────────────────────────────────────────────
 
   describe("route()", () => {

@@ -21,10 +21,12 @@ import {
   writeTierConfig,
   getTierStrings,
   loadTierConfig,
-  writeClassifierModel,
   DEFAULT_TIERS,
   resolveTierModel,
+  loadApiKey,
+  envVarName,
 } from "./tier-config.js";
+import { getIsRouterPrimary } from "./providers/index.js";
 import { consumeOverride } from "./providers/model-override.js";
 
 // ── Types (duck-typed to match OpenClaw plugin API) ───────────────────────────
@@ -214,6 +216,24 @@ const TIER_SUGGESTIONS: Record<string, string> = {
   REASONING: "anthropic/claude-opus-4-6, openai/o1, moonshot/kimi-k2.5 (frontier reasoning)",
 };
 
+function handleHelpCommand(): { text: string } {
+  const lines = [
+    `Claw LLM Router — Commands`,
+    ``,
+    `  /router              Show status (uptime, health, current tiers)`,
+    `  /router help         Show this help`,
+    `  /router setup        Show current tier config + suggested models`,
+    `  /router set <TIER> <provider/model>`,
+    `                       Set a tier's model (SIMPLE, MEDIUM, COMPLEX, REASONING)`,
+    `  /router doctor       Diagnose config, API keys, and proxy health`,
+    ``,
+    `Examples:`,
+    `  /router set SIMPLE google/gemini-2.5-flash`,
+    `  /router set REASONING anthropic/claude-opus-4-6`,
+  ];
+  return { text: lines.join("\n") };
+}
+
 function handleSetupCommand(): { text: string } {
   const tiers = getTierStrings();
   const lines = [
@@ -237,10 +257,9 @@ function handleSetupCommand(): { text: string } {
     `  COMPLEX   → ${TIER_SUGGESTIONS.COMPLEX}`,
     `  REASONING → ${TIER_SUGGESTIONS.REASONING}`,
     ``,
-    `To change the classifier model (used for ambiguous prompts):`,
-    `  /router set-classifier <provider/model>`,
-    ``,
     `Any OpenAI-compatible provider works. Anthropic uses native API with format conversion.`,
+    ``,
+    `Diagnose issues: /router doctor`,
   ];
   return { text: lines.join("\n") };
 }
@@ -278,20 +297,115 @@ function handleSetCommand(args: string): { text: string } {
   return { text: `Updated ${tierName} tier to: ${modelString}\n\nCurrent configuration:\n  SIMPLE    → ${current.SIMPLE}\n  MEDIUM    → ${current.MEDIUM}\n  COMPLEX   → ${current.COMPLEX}\n  REASONING → ${current.REASONING}` };
 }
 
-function handleSetClassifierCommand(args: string): { text: string } {
-  const modelString = args.trim();
-  if (!modelString || !modelString.includes("/")) {
-    return { text: `Usage: /router set-classifier <provider/model>\nExample: /router set-classifier google/gemini-2.5-flash` };
+export async function handleDoctorCommand(): Promise<{ text: string }> {
+  const lines: string[] = ["Router Doctor", ""];
+  let issues = 0;
+
+  // ── Configuration ──────────────────────────────────────────────────────────
+  lines.push("Configuration");
+
+  const configOk = isTierConfigured();
+  if (configOk) {
+    lines.push("  ✓ Config file (router-config.json)");
+  } else {
+    lines.push("  ✗ Config file missing or incomplete");
+    lines.push("    → Run /router setup or set tiers with /router set <TIER> <provider/model>");
+    issues++;
   }
 
-  try {
-    resolveTierModel(modelString);
-  } catch (err) {
-    return { text: `Could not resolve model "${modelString}": ${err instanceof Error ? err.message : String(err)}` };
+  const tiers = getTierStrings();
+  const tierNames = ["SIMPLE", "MEDIUM", "COMPLEX", "REASONING"] as const;
+  const allPresent = tierNames.every((t) => !!tiers[t]);
+  if (allPresent) {
+    lines.push("  ✓ All 4 tiers configured");
+  } else {
+    const missing = tierNames.filter((t) => !tiers[t]);
+    lines.push(`  ✗ Missing tiers: ${missing.join(", ")}`);
+    issues++;
   }
 
-  writeClassifierModel(modelString);
-  return { text: `Updated classifier model to: ${modelString}\n\nThis model will be used for LLM-assisted classification when the rule-based classifier has low confidence.` };
+  // ── Per-tier checks ────────────────────────────────────────────────────────
+  lines.push("");
+  lines.push("Tiers");
+
+  for (const tier of tierNames) {
+    const modelStr = tiers[tier];
+    lines.push(`  ${tier} → ${modelStr}`);
+
+    const checks: string[] = [];
+
+    // 1. Valid format
+    const slashIdx = modelStr.indexOf("/");
+    if (slashIdx === -1 || slashIdx === 0 || slashIdx === modelStr.length - 1) {
+      checks.push("✗ Valid format");
+      issues++;
+      lines.push(`    ${checks.join("  ")}`);
+      lines.push(`    → Expected "provider/model-id" format`);
+      continue;
+    }
+    checks.push("✓ Valid format");
+
+    const provider = modelStr.slice(0, slashIdx);
+
+    // 2. Base URL resolvable
+    try {
+      resolveTierModel(modelStr);
+      checks.push("✓ Base URL");
+    } catch {
+      checks.push("✗ Base URL (unknown provider)");
+      issues++;
+      lines.push(`    ${checks.join("  ")}`);
+      lines.push(`    → Add ${provider} to openclaw.json models.providers with a baseUrl`);
+      continue;
+    }
+
+    // 3. API key available
+    const { key, isOAuth } = loadApiKey(provider);
+    if (key) {
+      const suffix = isOAuth ? " (OAuth)" : "";
+      checks.push(`✓ API key${suffix}`);
+    } else {
+      checks.push("✗ API key");
+      issues++;
+      lines.push(`    ${checks.join("  ")}`);
+      lines.push(`    → Set ${envVarName(provider)} or add ${provider} credentials via /auth`);
+      continue;
+    }
+
+    lines.push(`    ${checks.join("  ")}`);
+  }
+
+  // ── Runtime ────────────────────────────────────────────────────────────────
+  lines.push("");
+  lines.push("Runtime");
+
+  const healthy = await fetch(`http://127.0.0.1:${PROXY_PORT}/health`)
+    .then((r) => r.ok)
+    .catch(() => false);
+
+  if (healthy) {
+    lines.push(`  ✓ Proxy healthy (port ${PROXY_PORT})`);
+  } else {
+    lines.push(`  ✗ Proxy not responding (port ${PROXY_PORT})`);
+    lines.push("    → Restart gateway or check logs for proxy errors");
+    issues++;
+  }
+
+  if (getIsRouterPrimary()) {
+    lines.push("  ℹ Router is primary model");
+  } else {
+    lines.push("  ℹ Router is not primary model");
+  }
+
+  // ── Summary ────────────────────────────────────────────────────────────────
+  lines.push("");
+  if (issues === 0) {
+    lines.push("No issues found.");
+  } else {
+    lines.push(`Found ${issues} issue${issues === 1 ? "" : "s"}.`);
+  }
+
+  return { text: lines.join("\n") };
 }
 
 // ── Plugin registration ───────────────────────────────────────────────────────
@@ -379,12 +493,16 @@ export default {
       handler: async (ctx) => {
         const args = (ctx.args ?? ctx.commandBody ?? "").trim();
 
+        if (args === "help") {
+          return handleHelpCommand();
+        }
+
         if (args === "setup") {
           return handleSetupCommand();
         }
 
-        if (args.startsWith("set-classifier ")) {
-          return handleSetClassifierCommand(args.slice("set-classifier ".length));
+        if (args === "doctor") {
+          return handleDoctorCommand();
         }
 
         if (args.startsWith("set ")) {
@@ -415,7 +533,7 @@ export default {
             `REASONING → ${tiers.REASONING}`,
             ``,
             `Port: ${PROXY_PORT} | To switch: /model claw-llm-router/auto`,
-            `Configure: /router setup | Set tier: /router set <TIER> <provider/model>`,
+            `Configure: /router setup | Set tier: /router set <TIER> <provider/model> | Diagnose: /router doctor`,
           ].join("\n"),
         };
       },

@@ -13,10 +13,7 @@ flowchart TD
     A[Incoming Request] --> B{Model ID?}
     B -->|simple, medium, complex, reasoning| C[Forced Tier]
     B -->|auto| D[Rule-Based Classifier]
-    D --> E{Confidence > 0.70?}
-    E -->|Yes| F[Assigned Tier]
-    E -->|No| G[LLM Classifier]
-    G --> F
+    D --> F[Assigned Tier]
     F --> H[Load Tier Config]
     C --> H
     H --> I[Resolve Provider]
@@ -65,7 +62,7 @@ The classifier scores prompts across 15 weighted dimensions:
 | Domain specificity | 0.02 | "quantum", "fpga", "genomics", "zero-knowledge" |
 | Negation complexity | 0.01 | "don't", "avoid", "except", "exclude" |
 
-Scores map to tiers via boundaries (SIMPLE < 0.0, MEDIUM < 0.15, COMPLEX < 0.35, REASONING >= 0.35). When confidence is low (< 0.70), a cheap LLM call confirms the classification.
+Scores map to tiers via boundaries (SIMPLE < 0.0, MEDIUM < 0.3, COMPLEX < 0.5, REASONING >= 0.5). The MEDIUM band is intentionally wide (0.30) so ambiguous prompts land confidently within it — no external LLM calls needed.
 
 ### Fallback Chain
 
@@ -80,87 +77,7 @@ REASONING → (no fallback)
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph Plugin ["claw-llm-router plugin"]
-        IDX[index.ts<br/>Plugin Entry] --> PROXY[proxy.ts<br/>HTTP Proxy :8401]
-        PROXY --> CLS[classifier.ts<br/>Rule-Based]
-        PROXY --> LLM[llm-classifier.ts<br/>LLM Backup]
-        PROXY --> CALL[providers/index.ts<br/>Provider Registry]
-        CALL --> OAI[OpenAI-Compatible<br/>Provider]
-        CALL --> ANT[Anthropic<br/>Provider]
-        CALL --> GW[Gateway<br/>Provider]
-        CALL --> GWO[Gateway + Override<br/>Provider]
-    end
-
-    OAI -->|Direct API| GOOGLE[Google Gemini]
-    OAI -->|Direct API| OPENAI[OpenAI]
-    OAI -->|Direct API| GROQ[Groq]
-    OAI -->|Direct API| XAI[xAI Grok]
-    OAI -->|Direct API| MINIMAX[MiniMax]
-    OAI -->|Direct API| MOONSHOT[MoonShot Kimi]
-    ANT -->|Direct API| ANTAPI[Anthropic API]
-    GW -->|Via Gateway| GWSVC[OpenClaw Gateway]
-    GWO -->|Via Gateway<br/>+ model override hook| GWSVC
-```
-
-### Provider Strategy
-
-All providers implement the `LLMProvider` interface:
-
-```typescript
-interface LLMProvider {
-  readonly name: string;
-  chatCompletion(
-    body: Record<string, unknown>,
-    spec: { modelId: string; apiKey: string; baseUrl: string },
-    stream: boolean,
-    res: ServerResponse,
-    log: PluginLogger,
-  ): Promise<void>;
-}
-```
-
-Provider resolution:
-
-| Condition | Provider | How It Works |
-|-----------|----------|-------------|
-| Any provider + OAuth token | `GatewayProvider` | Routes through OpenClaw gateway (handles token refresh + API format) |
-| Any provider + OAuth + router is primary model | `gateway-with-override` | Gateway call with `before_model_resolve` hook to prevent recursion |
-| Anthropic + direct API key | `AnthropicProvider` | Converts OpenAI format to Anthropic Messages API |
-| All other providers | `OpenAICompatibleProvider` | POST to `{baseUrl}/chat/completions` with Bearer auth |
-
-### OAuth Model Override (Recursion Prevention)
-
-When the router is set as OpenClaw's primary model and Anthropic uses an OAuth token, a naive gateway call would cause infinite recursion:
-
-```mermaid
-sequenceDiagram
-    participant U as User / OpenClaw
-    participant GW as OpenClaw Gateway
-    participant R as Router Proxy :8401
-    participant OVR as before_model_resolve Hook
-    participant A as Anthropic API
-
-    U->>GW: POST /v1/chat/completions<br/>model: claw-llm-router/auto
-    GW->>R: Forward to router proxy
-    R->>R: Classify → MEDIUM
-    R->>R: Resolve: Anthropic + OAuth + router is primary
-    R->>R: Store pending override<br/>(prompt → anthropic/claude-haiku)
-    R->>GW: POST /v1/chat/completions<br/>model: anthropic/claude-haiku
-    Note over GW: Gateway creates agent session<br/>Normally uses primary model (router) → recursion!
-    GW->>OVR: before_model_resolve fires
-    OVR->>OVR: Match pending override by prompt
-    OVR-->>GW: modelOverride: claude-haiku<br/>providerOverride: anthropic
-    Note over GW: Model overridden ✓<br/>No recursion back to router
-    GW->>A: Call Anthropic with OAuth
-    A-->>GW: Response
-    GW-->>R: Response
-    R-->>GW: Response
-    GW-->>U: Response
-```
-
-The override uses an in-process `Map` keyed by the first 500 characters of the user prompt. Entries auto-expire after 30 seconds.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for provider strategy, resolution logic, and the OAuth model override mechanism.
 
 ## Setup
 
@@ -206,6 +123,7 @@ Use the `/router` command in any OpenClaw chat:
 /router set MEDIUM anthropic/claude-haiku-4-5-20251001
 /router set COMPLEX anthropic/claude-sonnet-4-6
 /router set REASONING anthropic/claude-opus-4-6
+/router doctor             # Diagnose config, auth, and proxy issues
 ```
 
 ### Set as Primary Model
@@ -303,6 +221,23 @@ curl -s http://127.0.0.1:8401/v1/chat/completions \
 | `complex` | Force COMPLEX tier |
 | `reasoning` | Force REASONING tier |
 
+## Troubleshooting
+
+Run the built-in doctor to check your setup:
+
+```
+/router doctor
+```
+
+It verifies:
+
+- Config file exists and all 4 tiers are configured
+- Each tier has a valid `provider/model-id` format, resolvable base URL, and available API key
+- Proxy is running and healthy on port 8401
+- Whether the router is set as the primary model
+
+Any issues are flagged with fix instructions (e.g., which env var to set, how to add a custom provider).
+
 ## Project Structure
 
 ```
@@ -310,12 +245,16 @@ claw-llm-router/
 ├── index.ts                  # Plugin entry point, OpenClaw registration
 ├── proxy.ts                  # HTTP proxy server, request routing
 ├── classifier.ts             # Rule-based prompt classifier (15 dimensions)
-├── llm-classifier.ts         # LLM-based classifier for ambiguous prompts
 ├── tier-config.ts            # Tier-to-model config, API key loading
 ├── models.ts                 # Model definitions, provider constants
 ├── provider.ts               # OpenClaw provider plugin definition
 ├── router-config.json        # Tier configuration (auto-generated)
+├── router-logger.ts          # RouterLogger class — centralized log formatting
 ├── openclaw.plugin.json      # Plugin manifest
+├── docs/
+│   ├── ARCHITECTURE.md       # Provider strategy, OAuth override mechanism
+│   ├── CLASSIFIER.md         # Classifier dimensions, weights, extraction
+│   └── PROVIDERS.md          # Step-by-step guide for adding providers
 ├── providers/
 │   ├── types.ts              # LLMProvider interface, shared types
 │   ├── openai-compatible.ts  # Google, OpenAI, Groq, Mistral, etc.
@@ -326,6 +265,7 @@ claw-llm-router/
 └── tests/
     ├── classifier.test.ts
     ├── proxy.test.ts
+    ├── tier-config.test.ts
     └── providers/
         ├── anthropic.test.ts
         ├── gateway.test.ts
@@ -340,7 +280,7 @@ Tests use Node.js built-in test runner (`node:test`). No external test dependenc
 
 ```bash
 # Run all tests
-npx tsx --test tests/providers/*.test.ts tests/classifier.test.ts tests/proxy.test.ts
+npx tsx --test tests/providers/*.test.ts tests/classifier.test.ts tests/proxy.test.ts tests/tier-config.test.ts
 
 # Provider tests only
 npx tsx --test tests/providers/*.test.ts
@@ -349,11 +289,11 @@ npx tsx --test tests/providers/*.test.ts
 npx tsx --test tests/classifier.test.ts
 ```
 
-97 tests covering: provider resolution, Anthropic format conversion, streaming SSE, request sanitization, classification boundaries, model override store, and proxy routing.
+133 tests covering: provider resolution, Anthropic format conversion, streaming SSE, request sanitization, classification boundaries, model override store, proxy routing, doctor diagnostics, and tier config auth.
 
 ## Adding a New Provider
 
-See [PROVIDERS.md](PROVIDERS.md) for a step-by-step guide to implementing a new provider.
+See [docs/PROVIDERS.md](docs/PROVIDERS.md) for a step-by-step guide to implementing a new provider.
 
 ## License
 

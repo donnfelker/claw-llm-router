@@ -12,8 +12,7 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import { classify, tierFromModelId, FALLBACK_CHAIN, type Tier } from "./classifier.js";
 import { PROXY_PORT } from "./models.js";
-import { loadTierConfig, getClassifierModelSpec } from "./tier-config.js";
-import { llmClassify } from "./llm-classifier.js";
+import { loadTierConfig } from "./tier-config.js";
 import { callProvider } from "./providers/index.js";
 import type { PluginLogger, ChatMessage } from "./providers/types.js";
 import { RouterLogger } from "./router-logger.js";
@@ -69,6 +68,18 @@ async function handleChatCompletion(
     || userPrompt.startsWith("[chat messages since");
 
   let classifiablePrompt = userPrompt;
+
+  // Case 0: Strip "Conversation info (untrusted metadata)" wrapper
+  // OpenClaw prepends message metadata as a fenced JSON block:
+  //   Conversation info (untrusted metadata): ```json { ... }```\n\nActual prompt
+  // Strip it before classification so ```/json don't pollute scoring.
+  const metadataPrefix = "Conversation info (untrusted metadata):";
+  if (classifiablePrompt.startsWith(metadataPrefix)) {
+    const closingFence = classifiablePrompt.indexOf("```", metadataPrefix.length + 4); // skip opening ```
+    if (closingFence !== -1) {
+      classifiablePrompt = classifiablePrompt.slice(closingFence + 3).trim();
+    }
+  }
 
   if (isPackedContext) {
     // Case 1: Packed context — extract text after the current-message marker
@@ -133,28 +144,6 @@ async function handleChatCompletion(
       confidence: result.confidence,
       signals: result.signals,
     });
-
-    // Hybrid classifier: if rule-based confidence is low, ask a cheap LLM
-    if (result.needsLlmClassification) {
-      const ruleTier = tier;
-      try {
-        const classifierSpec = getClassifierModelSpec();
-        if (classifierSpec.apiKey) {
-          const llmTier = await llmClassify(classifiablePrompt, classifierSpec, (msg) => log.info(msg));
-          tier = llmTier;
-          classificationMethod = "llm-override";
-          rlog.llmOverride({ from: ruleTier, to: llmTier, ruleConf: result.confidence });
-        } else {
-          tier = "MEDIUM";
-          classificationMethod = "llm-skipped";
-          rlog.llmFallback(`skipped (no API key for ${classifierSpec.provider})`);
-        }
-      } catch (err) {
-        tier = "MEDIUM";
-        classificationMethod = "llm-failed";
-        rlog.llmFallback(`failed: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    }
   }
 
   // ── Route ──────────────────────────────────────────────────────────────

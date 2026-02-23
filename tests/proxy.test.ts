@@ -2,6 +2,8 @@ import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { classify } from "../classifier.js";
+import { handleDoctorCommand } from "../index.js";
+import { getTierStrings, writeTierConfig } from "../tier-config.js";
 
 // We test the proxy by starting it on a random port and making real HTTP requests.
 // Provider calls are mocked via globalThis.fetch.
@@ -216,6 +218,37 @@ describe("Proxy Server", () => {
     });
   });
 
+  describe("Conversation metadata stripping", () => {
+    function stripMetadata(prompt: string): string {
+      const metadataPrefix = "Conversation info (untrusted metadata):";
+      if (prompt.startsWith(metadataPrefix)) {
+        const closingFence = prompt.indexOf("```", metadataPrefix.length + 4);
+        if (closingFence !== -1) {
+          return prompt.slice(closingFence + 3).trim();
+        }
+      }
+      return prompt;
+    }
+
+    it("strips Conversation info metadata wrapper", () => {
+      const wrapped = 'Conversation info (untrusted metadata): ```json { "message_id": "abc-123" }```\n\nWhat is the capital of France?';
+      const extracted = stripMetadata(wrapped);
+      assert.equal(extracted, "What is the capital of France?");
+    });
+
+    it("classifies SIMPLE after stripping metadata with json/code keywords", () => {
+      const wrapped = 'Conversation info (untrusted metadata): ```json { "message_id": "abc-123" }```\n\nWhat is the capital of France?';
+      const extracted = stripMetadata(wrapped);
+      const result = classify(extracted);
+      assert.equal(result.tier, "SIMPLE");
+    });
+
+    it("does not strip normal prompts", () => {
+      const normal = "What is the capital of France?";
+      assert.equal(stripMetadata(normal), normal);
+    });
+  });
+
   describe("Embedded system prompt stripping", () => {
     // Mirrors proxy.ts extraction logic for non-packed-context messages
     function extractClassifiable(userPrompt: string, systemPrompt: string): string {
@@ -316,5 +349,51 @@ describe("Proxy Server", () => {
 
       assert.deepEqual(results, chain);
     });
+  });
+});
+
+describe("Doctor command", () => {
+  it("output includes all 4 tier names", async () => {
+    const result = await handleDoctorCommand();
+    assert.ok(result.text.includes("SIMPLE"), "Should include SIMPLE");
+    assert.ok(result.text.includes("MEDIUM"), "Should include MEDIUM");
+    assert.ok(result.text.includes("COMPLEX"), "Should include COMPLEX");
+    assert.ok(result.text.includes("REASONING"), "Should include REASONING");
+  });
+
+  it("detects missing API key", async () => {
+    const original = getTierStrings();
+    // Use perplexity — has a well-known base URL but very unlikely to have a key
+    const savedEnv = process.env.PERPLEXITY_API_KEY;
+    delete process.env.PERPLEXITY_API_KEY;
+    writeTierConfig({ ...original, SIMPLE: "perplexity/sonar" });
+    try {
+      const result = await handleDoctorCommand();
+      assert.ok(
+        result.text.includes("✗ API key"),
+        "Should report missing API key for perplexity tier",
+      );
+      assert.ok(
+        result.text.includes("PERPLEXITY_API_KEY"),
+        "Should suggest the correct env var name",
+      );
+    } finally {
+      writeTierConfig(original);
+      if (savedEnv !== undefined) process.env.PERPLEXITY_API_KEY = savedEnv;
+    }
+  });
+
+  it("detects invalid model format", async () => {
+    const original = getTierStrings();
+    writeTierConfig({ ...original, SIMPLE: "badformat-no-slash" });
+    try {
+      const result = await handleDoctorCommand();
+      assert.ok(
+        result.text.includes("✗ Valid format"),
+        "Should detect invalid model format without slash",
+      );
+    } finally {
+      writeTierConfig(original);
+    }
   });
 });

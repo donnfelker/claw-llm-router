@@ -86,9 +86,8 @@ const WEIGHTS: Record<string, number> = {
 // ── Tier boundaries ───────────────────────────────────────────────────────────
 
 const SIMPLE_MEDIUM_BOUNDARY    = 0.0;
-const MEDIUM_COMPLEX_BOUNDARY   = 0.15;
-const COMPLEX_REASONING_BOUNDARY = 0.35;
-const CONFIDENCE_THRESHOLD      = 0.70;
+const MEDIUM_COMPLEX_BOUNDARY   = 0.3;
+const COMPLEX_REASONING_BOUNDARY = 0.5;
 const CONFIDENCE_STEEPNESS      = 12.0;
 const MAX_TOKENS_FORCE_COMPLEX  = 100_000;
 
@@ -100,7 +99,6 @@ export type ClassificationResult = {
   score: number;
   signals: string[];
   reasoningMatches: number;
-  needsLlmClassification?: boolean;
 };
 
 function sigmoid(x: number): number {
@@ -345,19 +343,12 @@ export function classify(
 
   const confidence = sigmoid(distance);
 
-  // Low confidence → flag for LLM classification
-  const needsLlm = confidence < CONFIDENCE_THRESHOLD;
-  if (needsLlm) {
-    signals.push(`ambiguous (conf=${confidence.toFixed(2)}) → needs LLM classification`);
-  }
-
   return {
     tier,
     confidence,
     score: weightedScore,
     signals,
     reasoningMatches: reasoningMatchCount,
-    needsLlmClassification: needsLlm,
   };
 }
 

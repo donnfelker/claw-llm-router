@@ -112,20 +112,18 @@ describe("classify", () => {
     });
   });
 
-  describe("confidence and LLM classification flag", () => {
-    it("sets needsLlmClassification when confidence is low", () => {
-      // A prompt right on a boundary should have low confidence
+  describe("confidence", () => {
+    it("returns confidence between 0.5 and 1.0", () => {
       const result = classify("help me with this");
-      // Whether it needs LLM classification depends on where it falls
-      assert.equal(typeof result.needsLlmClassification, "boolean");
+      assert.ok(result.confidence >= 0.5);
+      assert.ok(result.confidence <= 1.0);
     });
 
-    it("high confidence results don't need LLM classification", () => {
+    it("simple prompts have high confidence with wider MEDIUM band", () => {
       const result = classify("what is 2+2?");
-      // Very simple question should have high confidence
-      if (result.confidence >= 0.70) {
-        assert.ok(!result.needsLlmClassification);
-      }
+      // With wider MEDIUM band (boundary at -0.05), simple prompts
+      // should land deeper in SIMPLE territory → higher confidence
+      assert.ok(result.confidence > 0.6);
     });
   });
 
@@ -137,6 +135,7 @@ describe("classify", () => {
       assert.ok("score" in result);
       assert.ok("signals" in result);
       assert.ok("reasoningMatches" in result);
+      assert.ok(!("needsLlmClassification" in result));
       assert.ok(Array.isArray(result.signals));
       assert.equal(typeof result.confidence, "number");
       assert.equal(typeof result.score, "number");
