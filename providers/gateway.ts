@@ -22,12 +22,16 @@ const OPENCLAW_CONFIG_PATH = `${HOME}/.openclaw/openclaw.json`;
 type GatewayInfo = { port: number; token: string };
 
 export function getGatewayInfo(): GatewayInfo {
-  const raw = readFileSync(OPENCLAW_CONFIG_PATH, "utf8");
-  const config = JSON.parse(raw) as { gateway?: { port?: number; auth?: { token?: string } } };
-  return {
-    port: config.gateway?.port ?? 18789,
-    token: config.gateway?.auth?.token ?? "",
-  };
+  try {
+    const raw = readFileSync(OPENCLAW_CONFIG_PATH, "utf8");
+    const config = JSON.parse(raw) as { gateway?: { port?: number; auth?: { token?: string } } };
+    return {
+      port: config.gateway?.port ?? 18789,
+      token: config.gateway?.auth?.token ?? "",
+    };
+  } catch {
+    return { port: 18789, token: "" };
+  }
 }
 
 let hasWarnedGatewayFallback = false;
