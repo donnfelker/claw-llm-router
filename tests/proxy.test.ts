@@ -164,6 +164,30 @@ describe("Proxy Server", () => {
       assert.ok(!normal.startsWith("[Chat messages since"));
       assert.ok(!normal.startsWith("[chat messages since"));
     });
+
+    it("extracts current message from packed context", () => {
+      const packed = [
+        "[Chat messages since your last reply - for context]",
+        "Alice: hey what's up",
+        "Bob: not much",
+        "[Current message - respond to this]",
+        "What is the capital of France?",
+      ].join("\n");
+
+      const marker = "[Current message - respond to this]";
+      const markerIdx = packed.indexOf(marker);
+      assert.ok(markerIdx !== -1, "marker should be found");
+      const extracted = packed.slice(markerIdx + marker.length).trim();
+      assert.equal(extracted, "What is the capital of France?");
+    });
+
+    it("returns empty string when no current message marker", () => {
+      const packed = "[Chat messages since your last reply - for context]\nAlice: hello";
+      const marker = "[Current message - respond to this]";
+      const markerIdx = packed.indexOf(marker);
+      assert.equal(markerIdx, -1);
+      // Falls back to empty classifiablePrompt → MEDIUM default
+    });
   });
 
   describe("Fallback chain behavior", () => {

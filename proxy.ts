@@ -57,11 +57,24 @@ async function handleChatCompletion(
   const userPrompt = extractUserPrompt(messages);
   const systemPrompt = extractSystemPrompt(messages);
 
-  // OpenClaw packs entire conversation history into a single user message
-  // for subagent/compaction requests (starts with "[Chat messages since").
-  // These internal requests can't be meaningfully classified — default to MEDIUM.
+  // OpenClaw packs conversation history + current message into a single user message
+  // for group chats and subagent requests. Format:
+  //   [Chat messages since your last reply - for context]
+  //   ...history...
+  //   [Current message - respond to this]
+  //   ...actual user prompt...
+  // Extract the current message and classify it instead of defaulting to MEDIUM.
   const isPackedContext = userPrompt.startsWith("[Chat messages since")
     || userPrompt.startsWith("[chat messages since");
+
+  let classifiablePrompt = userPrompt;
+  if (isPackedContext) {
+    const marker = "[Current message - respond to this]";
+    const markerIdx = userPrompt.indexOf(marker);
+    if (markerIdx !== -1) {
+      classifiablePrompt = userPrompt.slice(markerIdx + marker.length).trim();
+    }
+  }
 
   // Determine tier
   let tier: Tier;
@@ -69,14 +82,16 @@ async function handleChatCompletion(
   if (tierOverride) {
     tier = tierOverride;
     log.info(`Forced tier=${tier} (model=${modelId})`);
-  } else if (isPackedContext) {
+  } else if (isPackedContext && !classifiablePrompt) {
+    // No current message marker found or empty — can't classify, default to MEDIUM
     tier = "MEDIUM";
-    log.info(`Packed context detected (${userPrompt.length} chars) → default MEDIUM`);
+    log.info(`Packed context detected (${userPrompt.length} chars, no current message marker) → default MEDIUM`);
   } else {
-    const result = classify(userPrompt);
+    const result = classify(classifiablePrompt);
     tier = result.tier;
+    const packedNote = isPackedContext ? " (extracted from packed context)" : "";
     log.info(
-      `Classified tier=${tier} score=${result.score.toFixed(3)} conf=${result.confidence.toFixed(2)} signals=[${result.signals.slice(0, 3).join(", ")}]`,
+      `Classified tier=${tier} score=${result.score.toFixed(3)} conf=${result.confidence.toFixed(2)} signals=[${result.signals.slice(0, 3).join(", ")}]${packedNote}`,
     );
 
     // Hybrid classifier: if rule-based confidence is low, ask a cheap LLM
@@ -84,7 +99,7 @@ async function handleChatCompletion(
       try {
         const classifierSpec = getClassifierModelSpec((msg) => log.info(msg));
         if (classifierSpec.apiKey) {
-          const llmTier = await llmClassify(userPrompt, classifierSpec, (msg) => log.info(msg));
+          const llmTier = await llmClassify(classifiablePrompt, classifierSpec, (msg) => log.info(msg));
           log.info(`LLM classifier override: ${tier} → ${llmTier} (rule-based conf=${result.confidence.toFixed(2)})`);
           tier = llmTier;
         } else {
