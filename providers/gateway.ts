@@ -14,6 +14,7 @@
 import { readFileSync } from "node:fs";
 import type { ServerResponse } from "node:http";
 import type { LLMProvider, PluginLogger } from "./types.js";
+import { RouterLogger } from "../router-logger.js";
 
 const HOME = process.env.HOME;
 if (!HOME) throw new Error("[claw-llm-router] HOME environment variable not set");
@@ -74,6 +75,8 @@ export class GatewayProvider implements LLMProvider {
       throw new Error(`Gateway → ${modelId} ${resp.status}: ${errText.slice(0, 300)}`);
     }
 
+    const rlog = new RouterLogger(log);
+
     if (stream) {
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
@@ -89,15 +92,19 @@ export class GatewayProvider implements LLMProvider {
         if (!res.writableEnded) res.write(decoder.decode(value, { stream: true }));
       }
       if (!res.writableEnded) res.end();
-      log.info(`Streamed → ${modelId} (gateway)`);
+      rlog.done({ model: modelId, via: "gateway", streamed: true });
     } else {
       const data = (await resp.json()) as Record<string, unknown>;
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(data));
       const usage = (data.usage ?? {}) as Record<string, number>;
-      log.info(
-        `Complete → ${modelId} (gateway) in=${usage.prompt_tokens ?? "?"} out=${usage.completion_tokens ?? "?"}`,
-      );
+      rlog.done({
+        model: modelId,
+        via: "gateway",
+        streamed: false,
+        tokensIn: usage.prompt_tokens ?? "?",
+        tokensOut: usage.completion_tokens ?? "?",
+      });
     }
   }
 }

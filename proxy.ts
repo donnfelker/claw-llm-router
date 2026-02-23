@@ -16,6 +16,7 @@ import { loadTierConfig, getClassifierModelSpec } from "./tier-config.js";
 import { llmClassify } from "./llm-classifier.js";
 import { callProvider } from "./providers/index.js";
 import type { PluginLogger, ChatMessage } from "./providers/types.js";
+import { RouterLogger } from "./router-logger.js";
 
 // ── Message extraction ───────────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ async function handleChatCompletion(
   const stream = (body.stream as boolean) ?? false;
   const modelId = ((body.model as string) ?? "auto").replace("claw-llm-router/", "");
 
+  const rlog = new RouterLogger(log);
   const userPrompt = extractUserPrompt(messages);
   const systemPrompt = extractSystemPrompt(messages);
 
@@ -99,52 +101,75 @@ async function handleChatCompletion(
     }
   }
 
-  // Determine tier
+  // ── Classify ────────────────────────────────────────────────────────────
+  const extracted = classifiablePrompt !== userPrompt;
+  rlog.request({
+    model: modelId,
+    stream,
+    prompt: classifiablePrompt,
+    extraction: extracted ? { from: userPrompt.length, to: classifiablePrompt.length } : undefined,
+  });
+
   let tier: Tier;
+  let classificationMethod: string;
+
   const tierOverride = tierFromModelId(modelId);
   if (tierOverride) {
     tier = tierOverride;
-    log.info(`Forced tier=${tier} (model=${modelId})`);
+    classificationMethod = "forced";
+    rlog.classify({ tier, method: "forced", detail: `(model=${modelId})` });
   } else if (isPackedContext && !classifiablePrompt) {
-    // No current message marker found or empty — can't classify, default to MEDIUM
     tier = "MEDIUM";
-    log.info(`Packed context detected (${userPrompt.length} chars, no current message marker) → default MEDIUM`);
+    classificationMethod = "packed-default";
+    rlog.classify({ tier: "MEDIUM", method: "packed-default", detail: `(no current-message marker in ${userPrompt.length}-char packed context)` });
   } else {
     const result = classify(classifiablePrompt);
     tier = result.tier;
-    const extractionNote = classifiablePrompt !== userPrompt
-      ? ` (extracted ${classifiablePrompt.length} chars from ${userPrompt.length}-char message)`
-      : "";
-    log.info(
-      `Classified tier=${tier} score=${result.score.toFixed(3)} conf=${result.confidence.toFixed(2)} signals=[${result.signals.slice(0, 3).join(", ")}]${extractionNote}`,
-    );
+    classificationMethod = "rule-based";
+    rlog.classify({
+      tier,
+      method: "rule-based",
+      score: result.score,
+      confidence: result.confidence,
+      signals: result.signals,
+    });
 
     // Hybrid classifier: if rule-based confidence is low, ask a cheap LLM
     if (result.needsLlmClassification) {
+      const ruleTier = tier;
       try {
-        const classifierSpec = getClassifierModelSpec((msg) => log.info(msg));
+        const classifierSpec = getClassifierModelSpec();
         if (classifierSpec.apiKey) {
           const llmTier = await llmClassify(classifiablePrompt, classifierSpec, (msg) => log.info(msg));
-          log.info(`LLM classifier override: ${tier} → ${llmTier} (rule-based conf=${result.confidence.toFixed(2)})`);
           tier = llmTier;
+          classificationMethod = "llm-override";
+          rlog.llmOverride({ from: ruleTier, to: llmTier, ruleConf: result.confidence });
         } else {
-          log.warn(`LLM classifier skipped: no API key for ${classifierSpec.provider}. Falling back to MEDIUM.`);
           tier = "MEDIUM";
+          classificationMethod = "llm-skipped";
+          rlog.llmFallback(`skipped (no API key for ${classifierSpec.provider})`);
         }
       } catch (err) {
-        log.warn(`LLM classifier failed: ${err instanceof Error ? err.message : String(err)}. Falling back to MEDIUM.`);
         tier = "MEDIUM";
+        classificationMethod = "llm-failed";
+        rlog.llmFallback(`failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }
 
-  // Load tier config
-  const tierConfig = loadTierConfig((msg) => log.info(msg));
-
-  // Fallback chain
+  // ── Route ──────────────────────────────────────────────────────────────
+  const tierConfig = loadTierConfig();
   const chain = FALLBACK_CHAIN[tier];
-  let lastError: Error | undefined;
+  const targetSpec = tierConfig[tier];
+  rlog.route({
+    tier,
+    provider: targetSpec.provider,
+    model: targetSpec.modelId,
+    method: classificationMethod,
+    chain,
+  });
 
+  let lastError: Error | undefined;
   for (const attemptTier of chain) {
     const spec = tierConfig[attemptTier];
     try {
@@ -152,11 +177,11 @@ async function handleChatCompletion(
       return; // success
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      log.warn(`tier=${attemptTier} model=${spec.provider}/${spec.modelId} failed: ${lastError.message} — trying fallback`);
+      rlog.fallback({ tier: attemptTier, provider: spec.provider, model: spec.modelId, error: lastError.message });
     }
   }
 
-  log.error(`All tiers exhausted. Last error: ${lastError?.message}`);
+  rlog.failed({ chain, error: lastError?.message ?? "unknown" });
   if (!res.headersSent) {
     res.writeHead(502, { "Content-Type": "application/json" });
   }

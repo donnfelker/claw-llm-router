@@ -7,6 +7,7 @@
 
 import type { ServerResponse } from "node:http";
 import type { LLMProvider, PluginLogger, ChatMessage } from "./types.js";
+import { RouterLogger } from "../router-logger.js";
 
 // ── OpenAI → Anthropic request conversion ────────────────────────────────────
 
@@ -262,6 +263,8 @@ export class AnthropicProvider implements LLMProvider {
       throw new Error(`Anthropic ${spec.modelId} ${resp.status}: ${errText.slice(0, 300)}`);
     }
 
+    const rlog = new RouterLogger(log);
+
     if (stream) {
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
@@ -271,15 +274,19 @@ export class AnthropicProvider implements LLMProvider {
       const reader = resp.body?.getReader();
       if (!reader) throw new Error(`No response body from Anthropic ${spec.modelId}`);
       await convertAnthropicStream(reader, res, log);
-      log.info(`Streamed → ${spec.modelId} (anthropic direct)`);
+      rlog.done({ model: spec.modelId, via: "anthropic", streamed: true });
     } else {
       const data = (await resp.json()) as AnthropicResponse;
       const openaiResponse = toOpenAIResponse(data);
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(openaiResponse));
-      log.info(
-        `Complete → ${spec.modelId} (anthropic direct) in=${data.usage.input_tokens} out=${data.usage.output_tokens}`,
-      );
+      rlog.done({
+        model: spec.modelId,
+        via: "anthropic",
+        streamed: false,
+        tokensIn: data.usage.input_tokens,
+        tokensOut: data.usage.output_tokens,
+      });
     }
   }
 }

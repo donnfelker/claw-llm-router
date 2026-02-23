@@ -21,6 +21,7 @@ import {
   setPendingOverride,
   extractUserPromptFromBody,
 } from "./model-override.js";
+import { RouterLogger } from "../router-logger.js";
 
 const openaiCompatibleProvider = new OpenAICompatibleProvider();
 const anthropicProvider = new AnthropicProvider();
@@ -67,14 +68,13 @@ _cacheInterval.unref?.();
 const gatewayOverrideProvider: LLMProvider = {
   name: "gateway-with-override",
   async chatCompletion(body, spec, stream, res, log): Promise<void> {
+    const rlog = new RouterLogger(log);
     const fullSpec = spec as TierModelSpec;
     const userPrompt = extractUserPromptFromBody(body);
     if (!userPrompt) {
       log.warn("Gateway override: no user prompt found — override may not match");
     }
-    log.info(
-      `Gateway override: setting pending override → ${fullSpec.provider}/${spec.modelId}`,
-    );
+    rlog.override({ provider: fullSpec.provider, model: spec.modelId });
     setPendingOverride(userPrompt, spec.modelId, fullSpec.provider);
     await gatewayProvider.chatCompletion(body, spec, stream, res, log);
   },
@@ -102,8 +102,9 @@ export async function callProvider(
   res: ServerResponse,
   log: PluginLogger,
 ): Promise<void> {
+  const rlog = new RouterLogger(log);
   const provider = resolveProvider(spec);
-  log.info(`Provider: ${provider.name} for ${spec.provider}/${spec.modelId}`);
+  rlog.provider({ name: provider.name, provider: spec.provider, model: spec.modelId });
   await provider.chatCompletion(body, spec, stream, res, log);
 }
 
