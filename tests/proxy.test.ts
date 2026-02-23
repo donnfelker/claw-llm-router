@@ -1,6 +1,7 @@
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
+import { classify } from "../classifier.js";
 
 // We test the proxy by starting it on a random port and making real HTTP requests.
 // Provider calls are mocked via globalThis.fetch.
@@ -168,8 +169,8 @@ describe("Proxy Server", () => {
     it("extracts current message from packed context", () => {
       const packed = [
         "[Chat messages since your last reply - for context]",
-        "Alice: hey what's up",
-        "Bob: not much",
+        "user: hey what's up",
+        "assistant: not much, how can I help?",
         "[Current message - respond to this]",
         "What is the capital of France?",
       ].join("\n");
@@ -182,11 +183,36 @@ describe("Proxy Server", () => {
     });
 
     it("returns empty string when no current message marker", () => {
-      const packed = "[Chat messages since your last reply - for context]\nAlice: hello";
+      const packed = "[Chat messages since your last reply - for context]\nuser: hello";
       const marker = "[Current message - respond to this]";
       const markerIdx = packed.indexOf(marker);
       assert.equal(markerIdx, -1);
       // Falls back to empty classifiablePrompt → MEDIUM default
+    });
+
+    it("classifies extracted simple question as SIMPLE, not MEDIUM", () => {
+      // Realistic OpenClaw packed context: user asks about complex topics,
+      // then the LLM responds, and the current message is simple.
+      const packed = [
+        "[Chat messages since your last reply - for context]",
+        "user: Can you help me set up a Kubernetes cluster with distributed tracing and implement a microservice architecture with JWT auth token rotation?",
+        "assistant: Sure! Let me walk you through the steps for setting up a production-grade Kubernetes cluster with Jaeger distributed tracing and a microservice architecture using mTLS and JWT rotation...",
+        "[Current message - respond to this]",
+        "What is 2+2?",
+      ].join("\n");
+
+      // Extract current message (same logic as proxy.ts)
+      const marker = "[Current message - respond to this]";
+      const markerIdx = packed.indexOf(marker);
+      const extracted = packed.slice(markerIdx + marker.length).trim();
+
+      // Without extraction, the full packed text would classify higher
+      // due to technical terms in the history (kubernetes, distributed, etc.)
+      const fullResult = classify(packed);
+      const extractedResult = classify(extracted);
+
+      assert.equal(extractedResult.tier, "SIMPLE", "Extracted prompt should classify as SIMPLE");
+      assert.notEqual(fullResult.tier, "SIMPLE", "Full packed text should NOT classify as SIMPLE");
     });
   });
 
