@@ -286,6 +286,43 @@ It verifies:
 
 Any issues are flagged with fix instructions (e.g., which env var to set, how to add a custom provider).
 
+### Disable or Uninstall
+
+If the router is causing issues, you can quickly disable it without uninstalling:
+
+```bash
+openclaw plugins disable claw-llm-router
+openclaw gateway restart
+```
+
+If you set the router as your primary model, revert that first by removing (or changing) the `primary` field in `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "anthropic/claude-sonnet-4-6"
+      }
+    }
+  }
+}
+```
+
+To fully uninstall:
+
+```bash
+openclaw plugins uninstall claw-llm-router
+openclaw gateway restart
+```
+
+To re-enable a disabled plugin:
+
+```bash
+openclaw plugins enable claw-llm-router
+openclaw gateway restart
+```
+
 ## Project Structure
 
 ```
