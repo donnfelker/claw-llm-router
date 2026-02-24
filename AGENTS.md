@@ -8,13 +8,14 @@ OpenClaw sends chat completion requests to the router, which classifies the prom
 
 ## Testing & Code Quality
 
-- All checks must pass before completing any task
+- **`npm run check` must pass before completing any task** — this runs format, lint, typecheck, and tests in sequence. If any step fails, fix it before committing.
 - Run all checks: `npm run check` (format + lint + typecheck + tests)
 - Run tests only: `npm test`
 - Run formatting check: `npm run format` (fix with `npm run format:fix`)
 - Run linting: `npm run lint`
 - Run type checking: `npm run typecheck`
 - Never commit with failing checks
+- **Formatting is enforced by CI.** Always run `npm run format` (or `npm run check`) before committing. If formatting fails, fix it with `npm run format:fix` and include the formatting changes in your commit.
 - Tests use Node.js built-in test runner (`node:test`)
 - **Test context**: All test data should reflect realistic OpenClaw usage. Conversations are between `user` and `assistant` (the LLM) — not between named people (e.g., "Alice", "Bob"). Packed context uses OpenClaw's format: `[Chat messages since your last reply - for context]` with `user:`/`assistant:` prefixed messages, followed by `[Current message - respond to this]`.
 
