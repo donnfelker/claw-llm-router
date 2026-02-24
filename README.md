@@ -326,7 +326,6 @@ npx tsx --test tests/providers/*.test.ts
 npx tsx --test tests/classifier.test.ts
 ```
 
-133 tests covering: provider resolution, Anthropic format conversion, streaming SSE, request sanitization, classification boundaries, model override store, proxy routing, doctor diagnostics, and tier config auth.
 
 ## Adding a New Provider
 
