@@ -1,6 +1,6 @@
 # Claw LLM Router
 
-An [OpenClaw](https://openclaw.ai) plugin that classifies prompts by complexity and routes them to the cheapest capable model. Simple questions go to fast/cheap models; complex tasks go to frontier models. All routing decisions happen locally in under 1ms.
+An [OpenClaw](https://openclaw.ai) plugin that cuts LLM costs **40–80%** by classifying prompts and routing them to the cheapest capable model. Simple questions go to fast/cheap models (Gemini Flash at ~$0.15/1M tokens); complex tasks go to frontier models. All routing happens locally in <1ms.
 
 ## Why
 
@@ -83,23 +83,14 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for provider strategy, resoluti
 
 ### 1. Install the plugin
 
-Copy to your OpenClaw extensions directory:
-
 ```bash
-cp -r claw-llm-router ~/.openclaw/extensions/
+openclaw plugins install claw-llm-router
 ```
 
-Enable it in `~/.openclaw/openclaw.json`:
+Or install from a local directory during development:
 
-```json
-{
-  "plugins": {
-    "allow": ["claw-llm-router"],
-    "entries": {
-      "claw-llm-router": { "enabled": true }
-    }
-  }
-}
+```bash
+openclaw plugins install -l ./claw-llm-router
 ```
 
 ### 2. Set up API keys

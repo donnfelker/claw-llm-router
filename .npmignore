@@ -1,0 +1,19 @@
+# Tests & dev tooling
+tests/
+.github/
+eslint.config.mjs
+.prettierrc
+.prettierignore
+tsconfig.json
+AGENTS.md
+CLAUDE.md
+
+# Runtime generated
+router-config.json
+node_modules/
+dist/
+
+# OS
+.DS_Store
+*.tmp.*
+*.bak.*

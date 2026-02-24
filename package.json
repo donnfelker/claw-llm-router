@@ -1,8 +1,35 @@
 {
   "name": "claw-llm-router",
   "version": "1.0.0",
-  "private": true,
+  "description": "OpenClaw plugin that cuts LLM costs 40-80% by routing prompts to the cheapest capable model. 15-dimension classifier, <1ms local routing, automatic fallback chain.",
   "type": "module",
+  "author": "Donn Felker",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/donnfelker/claw-llm-router"
+  },
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "llm",
+    "router",
+    "classifier",
+    "ai"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "files": [
+    "*.ts",
+    "providers/",
+    "openclaw.plugin.json",
+    "README.md",
+    "LICENSE",
+    "docs/"
+  ],
   "scripts": {
     "test": "npx tsx --test tests/providers/*.test.ts tests/classifier.test.ts tests/proxy.test.ts tests/tier-config.test.ts tests/router-logger.test.ts",
     "typecheck": "tsc --noEmit",
@@ -11,12 +38,14 @@
     "format:fix": "prettier --write .",
     "check": "npm run format && npm run lint && npm run typecheck && npm run test"
   },
+  "dependencies": {
+    "tsx": "^4.0.0"
+  },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@types/node": "^22.0.0",
     "eslint": "^9.0.0",
     "prettier": "^3.0.0",
-    "tsx": "^4.0.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.0.0"
   }
