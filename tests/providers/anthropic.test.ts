@@ -1,7 +1,14 @@
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import type { ServerResponse } from "node:http";
-import { AnthropicProvider, convertMessages, buildAnthropicBody, toOpenAIResponse, mapStopReason, buildStreamChunk } from "../../providers/anthropic.js";
+import {
+  AnthropicProvider,
+  convertMessages,
+  buildAnthropicBody,
+  toOpenAIResponse,
+  mapStopReason,
+  buildStreamChunk,
+} from "../../providers/anthropic.js";
 import type { PluginLogger, ChatMessage } from "../../providers/types.js";
 
 function makeLogger(): PluginLogger & { messages: string[] } {
@@ -14,7 +21,12 @@ function makeLogger(): PluginLogger & { messages: string[] } {
   };
 }
 
-function makeRes(): ServerResponse & { _body: string; _statusCode: number; _headers: Record<string, string>; _ended: boolean } {
+function makeRes(): ServerResponse & {
+  _body: string;
+  _statusCode: number;
+  _headers: Record<string, string>;
+  _ended: boolean;
+} {
   const res = {
     _body: "",
     _statusCode: 0,
@@ -77,7 +89,13 @@ describe("convertMessages", () => {
 
   it("handles array content (multimodal format)", () => {
     const messages: ChatMessage[] = [
-      { role: "user", content: [{ type: "text", text: "Hello" }, { type: "text", text: " world" }] },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Hello" },
+          { type: "text", text: " world" },
+        ],
+      },
     ];
     const result = convertMessages(messages);
     assert.equal(result.messages[0].content, "Hello world");
@@ -164,12 +182,19 @@ describe("toOpenAIResponse", () => {
     assert.equal(result.object, "chat.completion");
     assert.equal(result.model, "claude-sonnet-4-6");
 
-    const choices = result.choices as Array<{ message: { role: string; content: string }; finish_reason: string }>;
+    const choices = result.choices as Array<{
+      message: { role: string; content: string };
+      finish_reason: string;
+    }>;
     assert.equal(choices[0].message.role, "assistant");
     assert.equal(choices[0].message.content, "Hello world");
     assert.equal(choices[0].finish_reason, "stop");
 
-    const usage = result.usage as { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+    const usage = result.usage as {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+    };
     assert.equal(usage.prompt_tokens, 10);
     assert.equal(usage.completion_tokens, 5);
     assert.equal(usage.total_tokens, 15);
@@ -190,7 +215,10 @@ describe("toOpenAIResponse", () => {
     };
 
     const result = toOpenAIResponse(anthropic);
-    const choices = result.choices as Array<{ message: { content: string }; finish_reason: string }>;
+    const choices = result.choices as Array<{
+      message: { content: string };
+      finish_reason: string;
+    }>;
     assert.equal(choices[0].message.content, "Part 1 Part 2");
     assert.equal(choices[0].finish_reason, "length");
   });
@@ -253,7 +281,11 @@ describe("AnthropicProvider", () => {
 
     await provider.chatCompletion(
       { messages: [{ role: "user", content: "hello" }], max_tokens: 100 },
-      { modelId: "claude-sonnet-4-6", apiKey: "sk-ant-test", baseUrl: "https://api.anthropic.com/v1" },
+      {
+        modelId: "claude-sonnet-4-6",
+        apiKey: "sk-ant-test",
+        baseUrl: "https://api.anthropic.com/v1",
+      },
       false,
       res,
       log,
@@ -302,7 +334,11 @@ describe("AnthropicProvider", () => {
 
     await provider.chatCompletion(
       { messages: [{ role: "user", content: "hello" }] },
-      { modelId: "claude-sonnet-4-6", apiKey: "sk-ant-test", baseUrl: "https://api.anthropic.com/v1" },
+      {
+        modelId: "claude-sonnet-4-6",
+        apiKey: "sk-ant-test",
+        baseUrl: "https://api.anthropic.com/v1",
+      },
       true,
       res,
       log,
@@ -332,7 +368,11 @@ describe("AnthropicProvider", () => {
       () =>
         provider.chatCompletion(
           { messages: [{ role: "user", content: "hello" }] },
-          { modelId: "claude-sonnet-4-6", apiKey: "bad-key", baseUrl: "https://api.anthropic.com/v1" },
+          {
+            modelId: "claude-sonnet-4-6",
+            apiKey: "bad-key",
+            baseUrl: "https://api.anthropic.com/v1",
+          },
           false,
           res,
           log,

@@ -24,10 +24,22 @@
         "type": "object",
         "description": "Model assignment per tier (format: provider/model-id)",
         "properties": {
-          "SIMPLE": { "type": "string", "description": "Model for simple tasks (e.g., google/gemini-2.5-flash)" },
-          "MEDIUM": { "type": "string", "description": "Model for medium tasks (e.g., anthropic/claude-haiku-4-5-20251001)" },
-          "COMPLEX": { "type": "string", "description": "Model for complex tasks (e.g., anthropic/claude-sonnet-4-6)" },
-          "REASONING": { "type": "string", "description": "Model for reasoning tasks (e.g., anthropic/claude-opus-4-6)" }
+          "SIMPLE": {
+            "type": "string",
+            "description": "Model for simple tasks (e.g., google/gemini-2.5-flash)"
+          },
+          "MEDIUM": {
+            "type": "string",
+            "description": "Model for medium tasks (e.g., anthropic/claude-haiku-4-5-20251001)"
+          },
+          "COMPLEX": {
+            "type": "string",
+            "description": "Model for complex tasks (e.g., anthropic/claude-sonnet-4-6)"
+          },
+          "REASONING": {
+            "type": "string",
+            "description": "Model for reasoning tasks (e.g., anthropic/claude-opus-4-6)"
+          }
         }
       },
       "classifierModel": {

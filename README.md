@@ -31,12 +31,12 @@ flowchart TD
 
 ### The Four Tiers
 
-| Tier | Default Model | When It's Used |
-|------|--------------|----------------|
-| **SIMPLE** | `google/gemini-2.5-flash` | Factual lookups, definitions, translations, greetings, yes/no, simple math |
-| **MEDIUM** | `anthropic/claude-haiku-4-5-20251001` | Code snippets, explanations, summaries, moderate analysis |
-| **COMPLEX** | `anthropic/claude-sonnet-4-6` | Multi-file code, architecture, long-form analysis, detailed technical work |
-| **REASONING** | `anthropic/claude-opus-4-6` | Mathematical proofs, formal logic, multi-step derivations, deep chain-of-thought |
+| Tier          | Default Model                         | When It's Used                                                                   |
+| ------------- | ------------------------------------- | -------------------------------------------------------------------------------- |
+| **SIMPLE**    | `google/gemini-2.5-flash`             | Factual lookups, definitions, translations, greetings, yes/no, simple math       |
+| **MEDIUM**    | `anthropic/claude-haiku-4-5-20251001` | Code snippets, explanations, summaries, moderate analysis                        |
+| **COMPLEX**   | `anthropic/claude-sonnet-4-6`         | Multi-file code, architecture, long-form analysis, detailed technical work       |
+| **REASONING** | `anthropic/claude-opus-4-6`           | Mathematical proofs, formal logic, multi-step derivations, deep chain-of-thought |
 
 Every tier is configurable. Any OpenAI-compatible provider works, plus Anthropic's native Messages API.
 
@@ -44,23 +44,23 @@ Every tier is configurable. Any OpenAI-compatible provider works, plus Anthropic
 
 The classifier scores prompts across 15 weighted dimensions:
 
-| Dimension | Weight | What It Detects |
-|-----------|--------|----------------|
-| Reasoning markers | 0.18 | "prove", "theorem", "derive", "step by step" |
-| Code presence | 0.15 | `function`, `class`, `import`, backtick blocks |
-| Technical terms | 0.13 | "algorithm", "kubernetes", "distributed" |
-| Multi-step patterns | 0.10 | "first...then", "step 1", numbered lists |
-| Token count | 0.08 | Short prompts pull toward SIMPLE, long toward COMPLEX |
-| Agentic tasks | 0.06 | "read file", "edit", "deploy", "fix", "debug" |
-| Imperative verbs | 0.05 | "build", "create", "implement", "design" |
-| Creative markers | 0.04 | "story", "poem", "brainstorm", "write a" |
-| Question complexity | 0.04 | Multiple question marks |
-| Constraint indicators | 0.04 | "at most", "within", "budget", "maximum" |
-| Output format | 0.03 | "json", "yaml", "table", "csv" |
-| Simple indicators | 0.02 | "what is", "define", "who is", "capital of" |
-| Reference complexity | 0.02 | "the code", "above", "the api" |
-| Domain specificity | 0.02 | "quantum", "fpga", "genomics", "zero-knowledge" |
-| Negation complexity | 0.01 | "don't", "avoid", "except", "exclude" |
+| Dimension             | Weight | What It Detects                                       |
+| --------------------- | ------ | ----------------------------------------------------- |
+| Reasoning markers     | 0.18   | "prove", "theorem", "derive", "step by step"          |
+| Code presence         | 0.15   | `function`, `class`, `import`, backtick blocks        |
+| Technical terms       | 0.13   | "algorithm", "kubernetes", "distributed"              |
+| Multi-step patterns   | 0.10   | "first...then", "step 1", numbered lists              |
+| Token count           | 0.08   | Short prompts pull toward SIMPLE, long toward COMPLEX |
+| Agentic tasks         | 0.06   | "read file", "edit", "deploy", "fix", "debug"         |
+| Imperative verbs      | 0.05   | "build", "create", "implement", "design"              |
+| Creative markers      | 0.04   | "story", "poem", "brainstorm", "write a"              |
+| Question complexity   | 0.04   | Multiple question marks                               |
+| Constraint indicators | 0.04   | "at most", "within", "budget", "maximum"              |
+| Output format         | 0.03   | "json", "yaml", "table", "csv"                        |
+| Simple indicators     | 0.02   | "what is", "define", "who is", "capital of"           |
+| Reference complexity  | 0.02   | "the code", "above", "the api"                        |
+| Domain specificity    | 0.02   | "quantum", "fpga", "genomics", "zero-knowledge"       |
+| Negation complexity   | 0.01   | "don't", "avoid", "except", "exclude"                 |
 
 Scores map to tiers via boundaries (SIMPLE < 0.0, MEDIUM < 0.3, COMPLEX < 0.5, REASONING >= 0.5). The MEDIUM band is intentionally wide (0.30) so ambiguous prompts land confidently within it — no external LLM calls needed.
 
@@ -106,13 +106,13 @@ Enable it in `~/.openclaw/openclaw.json`:
 
 The router needs at least one provider API key. Set keys for the providers you want to use:
 
-| Provider | Environment Variable | Tier Suggestion |
-|----------|---------------------|----------------|
-| Google | `GEMINI_API_KEY` | SIMPLE |
+| Provider  | Environment Variable                     | Tier Suggestion            |
+| --------- | ---------------------------------------- | -------------------------- |
+| Google    | `GEMINI_API_KEY`                         | SIMPLE                     |
 | Anthropic | `ANTHROPIC_API_KEY` or OAuth via `/auth` | MEDIUM, COMPLEX, REASONING |
-| OpenAI | `OPENAI_API_KEY` | MEDIUM, COMPLEX |
-| Groq | `GROQ_API_KEY` | SIMPLE |
-| xAI | `XAI_API_KEY` | MEDIUM |
+| OpenAI    | `OPENAI_API_KEY`                         | MEDIUM, COMPLEX            |
+| Groq      | `GROQ_API_KEY`                           | SIMPLE                     |
+| xAI       | `XAI_API_KEY`                            | MEDIUM                     |
 
 You can also add credentials through OpenClaw's `/auth` command.
 
@@ -176,13 +176,13 @@ The router reads API keys from OpenClaw's existing auth stores (never stores its
 
 The `/router` slash command manages the router from any OpenClaw chat. No gateway restart needed for tier changes — they take effect on the next request.
 
-| Command | What It Does |
-|---------|-------------|
-| `/router` | Show status: uptime, proxy health, current tier assignments |
-| `/router help` | List all subcommands with examples |
-| `/router setup` | Show current config with suggested models per tier |
-| `/router set <TIER> <provider/model>` | Change a tier's model |
-| `/router doctor` | Diagnose config, API keys, base URLs, and proxy health |
+| Command                               | What It Does                                                |
+| ------------------------------------- | ----------------------------------------------------------- |
+| `/router`                             | Show status: uptime, proxy health, current tier assignments |
+| `/router help`                        | List all subcommands with examples                          |
+| `/router setup`                       | Show current config with suggested models per tier          |
+| `/router set <TIER> <provider/model>` | Change a tier's model                                       |
+| `/router doctor`                      | Diagnose config, API keys, base URLs, and proxy health      |
 
 Common workflows:
 
@@ -251,21 +251,21 @@ curl -s http://127.0.0.1:8401/v1/chat/completions \
 
 ### Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/v1/chat/completions` | POST | Chat completions (OpenAI-compatible) |
-| `/v1/models` | GET | List available models |
-| `/health` | GET | Health check |
+| Endpoint               | Method | Description                          |
+| ---------------------- | ------ | ------------------------------------ |
+| `/v1/chat/completions` | POST   | Chat completions (OpenAI-compatible) |
+| `/v1/models`           | GET    | List available models                |
+| `/health`              | GET    | Health check                         |
 
 ### Virtual Model IDs
 
-| Model ID | Behavior |
-|----------|----------|
-| `auto` | Classify and route automatically |
-| `simple` | Force SIMPLE tier |
-| `medium` | Force MEDIUM tier |
-| `complex` | Force COMPLEX tier |
-| `reasoning` | Force REASONING tier |
+| Model ID    | Behavior                         |
+| ----------- | -------------------------------- |
+| `auto`      | Classify and route automatically |
+| `simple`    | Force SIMPLE tier                |
+| `medium`    | Force MEDIUM tier                |
+| `complex`   | Force COMPLEX tier               |
+| `reasoning` | Force REASONING tier             |
 
 ## Troubleshooting
 

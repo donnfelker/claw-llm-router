@@ -34,23 +34,23 @@ An earlier version used a hybrid approach: when rule-based confidence was below 
 
 Each dimension scores the prompt on a scale (typically -1.0 to 1.0). The weighted sum determines the tier.
 
-| # | Dimension | Weight | What it detects |
-|---|-----------|--------|-----------------|
-| 1 | `tokenCount` | 0.08 | Prompt length (<50 tokens = -1.0, >500 = 1.0) |
-| 2 | `codePresence` | 0.14 | Code keywords: `function`, `class`, `import`, `` ``` ``, etc. |
-| 3 | `reasoningMarkers` | 0.17 | `prove`, `theorem`, `step by step`, `chain of thought`, etc. |
-| 4 | `technicalTerms` | 0.09 | `algorithm`, `kubernetes`, `distributed`, `architecture`, etc. |
-| 5 | `creativeMarkers` | 0.05 | `story`, `poem`, `brainstorm`, `write a`, etc. |
-| 6 | `simpleIndicators` | 0.11 | `what is`, `define`, `hello`, `capital of` → scores -1.0 (pulls toward SIMPLE) |
-| 7 | `multiStepPatterns` | 0.11 | Regex: `first.*then`, `step \d`, numbered lists |
-| 8 | `questionComplexity` | 0.04 | 4+ question marks in the prompt |
-| 9 | `imperativeVerbs` | 0.03 | `build`, `create`, `implement`, `deploy`, etc. |
-| 10 | `constraintCount` | 0.04 | `at most`, `within`, `maximum`, `budget`, etc. |
-| 11 | `outputFormat` | 0.03 | `json`, `yaml`, `table`, `format as`, etc. |
-| 12 | `referenceComplexity` | 0.02 | `the docs`, `the api`, `attached`, `above`, etc. |
-| 13 | `negationComplexity` | 0.01 | `don't`, `avoid`, `without`, `except`, etc. |
-| 14 | `domainSpecificity` | 0.02 | `quantum`, `fpga`, `genomics`, `zero-knowledge`, etc. |
-| 15 | `agenticTask` | 0.06 | `read file`, `edit`, `deploy`, `fix`, `debug`, `step 1`, etc. |
+| #   | Dimension             | Weight | What it detects                                                                |
+| --- | --------------------- | ------ | ------------------------------------------------------------------------------ |
+| 1   | `tokenCount`          | 0.08   | Prompt length (<50 tokens = -1.0, >500 = 1.0)                                  |
+| 2   | `codePresence`        | 0.14   | Code keywords: `function`, `class`, `import`, ` ``` `, etc.                    |
+| 3   | `reasoningMarkers`    | 0.17   | `prove`, `theorem`, `step by step`, `chain of thought`, etc.                   |
+| 4   | `technicalTerms`      | 0.09   | `algorithm`, `kubernetes`, `distributed`, `architecture`, etc.                 |
+| 5   | `creativeMarkers`     | 0.05   | `story`, `poem`, `brainstorm`, `write a`, etc.                                 |
+| 6   | `simpleIndicators`    | 0.11   | `what is`, `define`, `hello`, `capital of` → scores -1.0 (pulls toward SIMPLE) |
+| 7   | `multiStepPatterns`   | 0.11   | Regex: `first.*then`, `step \d`, numbered lists                                |
+| 8   | `questionComplexity`  | 0.04   | 4+ question marks in the prompt                                                |
+| 9   | `imperativeVerbs`     | 0.03   | `build`, `create`, `implement`, `deploy`, etc.                                 |
+| 10  | `constraintCount`     | 0.04   | `at most`, `within`, `maximum`, `budget`, etc.                                 |
+| 11  | `outputFormat`        | 0.03   | `json`, `yaml`, `table`, `format as`, etc.                                     |
+| 12  | `referenceComplexity` | 0.02   | `the docs`, `the api`, `attached`, `above`, etc.                               |
+| 13  | `negationComplexity`  | 0.01   | `don't`, `avoid`, `without`, `except`, etc.                                    |
+| 14  | `domainSpecificity`   | 0.02   | `quantum`, `fpga`, `genomics`, `zero-knowledge`, etc.                          |
+| 15  | `agenticTask`         | 0.06   | `read file`, `edit`, `deploy`, `fix`, `debug`, `step 1`, etc.                  |
 
 Weights sum to 1.0 and are aligned with [ClawRouter](https://github.com/claw-project/claw-router)'s 14-dimension scheme, scaled to accommodate our 15th dimension (`agenticTask`).
 
@@ -58,12 +58,12 @@ Weights sum to 1.0 and are aligned with [ClawRouter](https://github.com/claw-pro
 
 The weighted sum maps to a tier via fixed boundaries:
 
-| Score range | Tier | Band width |
-|-------------|------|------------|
-| < 0.00 | SIMPLE | — |
-| 0.00 – 0.30 | MEDIUM | 0.30 |
-| 0.30 – 0.50 | COMPLEX | 0.20 |
-| >= 0.50 | REASONING | — |
+| Score range | Tier      | Band width |
+| ----------- | --------- | ---------- |
+| < 0.00      | SIMPLE    | —          |
+| 0.00 – 0.30 | MEDIUM    | 0.30       |
+| 0.30 – 0.50 | COMPLEX   | 0.20       |
+| >= 0.50     | REASONING | —          |
 
 These boundaries match [ClawRouter](https://github.com/claw-project/claw-router)'s production-proven values. The MEDIUM band is intentionally wide (0.30) so that ambiguous prompts — which tend to cluster around boundaries — land confidently within MEDIUM rather than triggering expensive misrouting. With steepness=12.0, a score at the center of MEDIUM (0.15) has distance 0.15 to the nearest boundary, yielding confidence ~0.86.
 
@@ -71,11 +71,11 @@ These boundaries match [ClawRouter](https://github.com/claw-project/claw-router)
 
 These override the score-based mapping regardless of weighted sum:
 
-| Condition | Forced tier | Min confidence |
-|-----------|-------------|----------------|
-| >100k estimated tokens | COMPLEX | 0.95 |
-| 2+ reasoning keywords | REASONING | 0.85 |
-| 4+ complexity signals (technical + imperative + agentic) AND (multi-step OR long prompt) | COMPLEX | 0.85 |
+| Condition                                                                                | Forced tier | Min confidence |
+| ---------------------------------------------------------------------------------------- | ----------- | -------------- |
+| >100k estimated tokens                                                                   | COMPLEX     | 0.95           |
+| 2+ reasoning keywords                                                                    | REASONING   | 0.85           |
+| 4+ complexity signals (technical + imperative + agentic) AND (multi-step OR long prompt) | COMPLEX     | 0.85           |
 
 ### Confidence Calculation
 
@@ -106,6 +106,7 @@ Before classification, the proxy extracts the actual user text from potentially 
 ### Three extraction cases
 
 1. **Packed context** — OpenClaw group chats/subagents wrap history + current message:
+
    ```
    [Chat messages since your last reply - for context]
    user: earlier message
@@ -113,6 +114,7 @@ Before classification, the proxy extracts the actual user text from potentially 
    [Current message - respond to this]
    What is 2+2?
    ```
+
    The classifier only sees `What is 2+2?`.
 
 2. **Embedded system prompt** — Some OpenClaw paths (webchat) prepend the system prompt to the user message instead of sending it as a separate system-role message. If the system prompt text is found inside the user message, it's stripped before classification.
@@ -125,20 +127,20 @@ These extraction steps are critical — without them, system prompt keywords lik
 
 Users can bypass the classifier entirely by using tier-specific model IDs:
 
-| Model ID | Tier |
-|----------|------|
-| `simple` or `claw-llm-router/simple` | SIMPLE |
-| `medium` or `claw-llm-router/medium` | MEDIUM |
-| `complex` or `claw-llm-router/complex` | COMPLEX |
+| Model ID                                   | Tier      |
+| ------------------------------------------ | --------- |
+| `simple` or `claw-llm-router/simple`       | SIMPLE    |
+| `medium` or `claw-llm-router/medium`       | MEDIUM    |
+| `complex` or `claw-llm-router/complex`     | COMPLEX   |
 | `reasoning` or `claw-llm-router/reasoning` | REASONING |
 
 ## Fallback Chain
 
 If a provider fails, the router tries the next tier up:
 
-| Starting tier | Fallback chain |
-|---------------|----------------|
-| SIMPLE | SIMPLE → MEDIUM → COMPLEX |
-| MEDIUM | MEDIUM → COMPLEX |
-| COMPLEX | COMPLEX → REASONING |
-| REASONING | REASONING (no fallback) |
+| Starting tier | Fallback chain            |
+| ------------- | ------------------------- |
+| SIMPLE        | SIMPLE → MEDIUM → COMPLEX |
+| MEDIUM        | MEDIUM → COMPLEX          |
+| COMPLEX       | COMPLEX → REASONING       |
+| REASONING     | REASONING (no fallback)   |

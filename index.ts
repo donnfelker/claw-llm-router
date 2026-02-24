@@ -20,7 +20,6 @@ import {
   isTierConfigured,
   writeTierConfig,
   getTierStrings,
-  loadTierConfig,
   DEFAULT_TIERS,
   resolveTierModel,
   loadApiKey,
@@ -51,14 +50,6 @@ type OpenClawConfig = Record<string, unknown> & {
 
 type BeforeModelResolveEvent = {
   prompt: string;
-};
-
-type BeforeModelResolveContext = {
-  agentId?: string;
-  sessionKey?: string;
-  sessionId?: string;
-  workspaceDir?: string;
-  messageProvider?: string;
 };
 
 type BeforeModelResolveResult = {
@@ -294,7 +285,9 @@ function handleSetupCommand(): { text: string } {
 function handleSetCommand(args: string): { text: string } {
   const parts = args.split(/\s+/);
   if (parts.length !== 2) {
-    return { text: `Usage: /router set <TIER> <provider/model>\nExample: /router set SIMPLE google/gemini-2.5-flash` };
+    return {
+      text: `Usage: /router set <TIER> <provider/model>\nExample: /router set SIMPLE google/gemini-2.5-flash`,
+    };
   }
 
   const tierName = parts[0].toUpperCase();
@@ -306,14 +299,18 @@ function handleSetCommand(args: string): { text: string } {
   }
 
   if (!modelString.includes("/")) {
-    return { text: `Invalid model format "${modelString}". Expected "provider/model-id" (e.g., google/gemini-2.5-flash)` };
+    return {
+      text: `Invalid model format "${modelString}". Expected "provider/model-id" (e.g., google/gemini-2.5-flash)`,
+    };
   }
 
   // Validate the model can be resolved
   try {
     resolveTierModel(modelString);
   } catch (err) {
-    return { text: `Could not resolve model "${modelString}": ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      text: `Could not resolve model "${modelString}": ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 
   // Update the tier
@@ -321,7 +318,9 @@ function handleSetCommand(args: string): { text: string } {
   current[tierName as keyof typeof current] = modelString;
   writeTierConfig(current);
 
-  return { text: `Updated ${tierName} tier to: ${modelString}\n\nCurrent configuration:\n  SIMPLE    → ${current.SIMPLE}\n  MEDIUM    → ${current.MEDIUM}\n  COMPLEX   → ${current.COMPLEX}\n  REASONING → ${current.REASONING}` };
+  return {
+    text: `Updated ${tierName} tier to: ${modelString}\n\nCurrent configuration:\n  SIMPLE    → ${current.SIMPLE}\n  MEDIUM    → ${current.MEDIUM}\n  COMPLEX   → ${current.COMPLEX}\n  REASONING → ${current.REASONING}`,
+  };
 }
 
 export async function handleDoctorCommand(): Promise<{ text: string }> {
@@ -471,7 +470,9 @@ export default {
     // 5. Auto-configure default tiers on first run
     if (!isTierConfigured()) {
       writeTierConfig(DEFAULT_TIERS);
-      log.info(`${LOG_PREFIX} First run: default tier config written. Use /router setup to customize.`);
+      log.info(
+        `${LOG_PREFIX} First run: default tier config written. Use /router setup to customize.`,
+      );
     }
 
     // 5b. Warn about missing API keys (non-blocking)
@@ -494,7 +495,9 @@ export default {
         } catch (err: unknown) {
           const e = err as NodeJS.ErrnoException;
           if (e.code === "EADDRINUSE") {
-            log.warn(`${LOG_PREFIX} Port ${PROXY_PORT} already in use — another instance may be running`);
+            log.warn(
+              `${LOG_PREFIX} Port ${PROXY_PORT} already in use — another instance may be running`,
+            );
           } else {
             log.error(`${LOG_PREFIX} Failed to start proxy: ${err}`);
           }

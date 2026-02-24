@@ -8,88 +8,187 @@
 // ── Keyword lists ─────────────────────────────────────────────────────────────
 
 const CODE_KEYWORDS = [
-  "function", "class", "import", "def", "select", "async", "await",
-  "const", "let", "var", "return", "```",
+  "function",
+  "class",
+  "import",
+  "def",
+  "select",
+  "async",
+  "await",
+  "const",
+  "let",
+  "var",
+  "return",
+  "```",
 ];
 const REASONING_KEYWORDS = [
-  "prove", "theorem", "derive", "step by step", "chain of thought",
-  "formally", "mathematical", "proof", "logically",
+  "prove",
+  "theorem",
+  "derive",
+  "step by step",
+  "chain of thought",
+  "formally",
+  "mathematical",
+  "proof",
+  "logically",
 ];
 const SIMPLE_KEYWORDS = [
-  "what is", "define", "translate", "hello", "yes or no",
-  "capital of", "how old", "who is", "when was",
+  "what is",
+  "define",
+  "translate",
+  "hello",
+  "yes or no",
+  "capital of",
+  "how old",
+  "who is",
+  "when was",
 ];
 const TECHNICAL_KEYWORDS = [
-  "algorithm", "optimize", "architecture", "distributed", "kubernetes",
-  "microservice", "database", "infrastructure",
+  "algorithm",
+  "optimize",
+  "architecture",
+  "distributed",
+  "kubernetes",
+  "microservice",
+  "database",
+  "infrastructure",
 ];
 const CREATIVE_KEYWORDS = [
-  "story", "poem", "compose", "brainstorm", "creative", "imagine", "write a",
+  "story",
+  "poem",
+  "compose",
+  "brainstorm",
+  "creative",
+  "imagine",
+  "write a",
 ];
 const IMPERATIVE_VERBS = [
-  "build", "create", "implement", "design", "develop", "construct",
-  "generate", "deploy", "configure", "set up",
+  "build",
+  "create",
+  "implement",
+  "design",
+  "develop",
+  "construct",
+  "generate",
+  "deploy",
+  "configure",
+  "set up",
 ];
 const CONSTRAINT_INDICATORS = [
-  "under", "at most", "at least", "within", "no more than",
-  "maximum", "minimum", "limit", "budget",
+  "under",
+  "at most",
+  "at least",
+  "within",
+  "no more than",
+  "maximum",
+  "minimum",
+  "limit",
+  "budget",
 ];
 const OUTPUT_FORMAT_KEYWORDS = [
-  "json", "yaml", "xml", "table", "csv", "markdown",
-  "schema", "format as", "structured",
+  "json",
+  "yaml",
+  "xml",
+  "table",
+  "csv",
+  "markdown",
+  "schema",
+  "format as",
+  "structured",
 ];
 const REFERENCE_KEYWORDS = [
-  "above", "below", "previous", "following", "the docs",
-  "the api", "the code", "earlier", "attached",
+  "above",
+  "below",
+  "previous",
+  "following",
+  "the docs",
+  "the api",
+  "the code",
+  "earlier",
+  "attached",
 ];
 const NEGATION_KEYWORDS = [
-  "don't", "do not", "avoid", "never", "without", "except", "exclude", "no longer",
+  "don't",
+  "do not",
+  "avoid",
+  "never",
+  "without",
+  "except",
+  "exclude",
+  "no longer",
 ];
 const DOMAIN_SPECIFIC_KEYWORDS = [
-  "quantum", "fpga", "vlsi", "risc-v", "asic", "photonics",
-  "genomics", "proteomics", "topological", "homomorphic", "zero-knowledge",
+  "quantum",
+  "fpga",
+  "vlsi",
+  "risc-v",
+  "asic",
+  "photonics",
+  "genomics",
+  "proteomics",
+  "topological",
+  "homomorphic",
+  "zero-knowledge",
 ];
 const AGENTIC_TASK_KEYWORDS = [
-  "read file", "look at", "check the", "open the", "edit", "modify",
-  "update the", "change the", "write to", "create file", "execute",
-  "deploy", "install", "npm", "pip", "compile", "after that", "once done",
-  "step 1", "step 2", "fix", "debug", "until it works", "iterate",
-  "make sure", "verify", "confirm",
+  "read file",
+  "look at",
+  "check the",
+  "open the",
+  "edit",
+  "modify",
+  "update the",
+  "change the",
+  "write to",
+  "create file",
+  "execute",
+  "deploy",
+  "install",
+  "npm",
+  "pip",
+  "compile",
+  "after that",
+  "once done",
+  "step 1",
+  "step 2",
+  "fix",
+  "debug",
+  "until it works",
+  "iterate",
+  "make sure",
+  "verify",
+  "confirm",
 ];
-const MULTI_STEP_PATTERNS = [
-  /first.*then/i,
-  /step\s+\d/i,
-  /\d\.\s/,
-];
+const MULTI_STEP_PATTERNS = [/first.*then/i, /step\s+\d/i, /\d\.\s/];
 
 // ── Weights (must sum to 1.0) ─────────────────────────────────────────────────
 
 // Weights aligned with ClawRouter (14 dims), scaled to fit our 15th (agenticTask)
 const WEIGHTS: Record<string, number> = {
-  reasoningMarkers:   0.17,  // ClawRouter: 0.18
-  codePresence:       0.14,  // ClawRouter: 0.15
-  simpleIndicators:   0.11,  // ClawRouter: 0.12  (was 0.02 — key change)
-  multiStepPatterns:  0.11,  // ClawRouter: 0.12
-  technicalTerms:     0.09,  // ClawRouter: 0.10
-  tokenCount:         0.08,  // ClawRouter: 0.08
-  agenticTask:        0.06,  // ours only (not in ClawRouter)
-  creativeMarkers:    0.05,  // ClawRouter: 0.05
-  questionComplexity: 0.04,  // ClawRouter: 0.05
-  constraintCount:    0.04,  // ClawRouter: 0.04
-  imperativeVerbs:    0.03,  // ClawRouter: 0.03
-  outputFormat:       0.03,  // ClawRouter: 0.03
-  domainSpecificity:  0.02,  // ClawRouter: 0.02
-  referenceComplexity:0.02,  // ClawRouter: 0.02
-  negationComplexity: 0.01,  // ClawRouter: 0.01
+  reasoningMarkers: 0.17, // ClawRouter: 0.18
+  codePresence: 0.14, // ClawRouter: 0.15
+  simpleIndicators: 0.11, // ClawRouter: 0.12  (was 0.02 — key change)
+  multiStepPatterns: 0.11, // ClawRouter: 0.12
+  technicalTerms: 0.09, // ClawRouter: 0.10
+  tokenCount: 0.08, // ClawRouter: 0.08
+  agenticTask: 0.06, // ours only (not in ClawRouter)
+  creativeMarkers: 0.05, // ClawRouter: 0.05
+  questionComplexity: 0.04, // ClawRouter: 0.05
+  constraintCount: 0.04, // ClawRouter: 0.04
+  imperativeVerbs: 0.03, // ClawRouter: 0.03
+  outputFormat: 0.03, // ClawRouter: 0.03
+  domainSpecificity: 0.02, // ClawRouter: 0.02
+  referenceComplexity: 0.02, // ClawRouter: 0.02
+  negationComplexity: 0.01, // ClawRouter: 0.01
 };
 
 // ── Tier boundaries ───────────────────────────────────────────────────────────
 
-const SIMPLE_MEDIUM_BOUNDARY    = 0.0;
-const MEDIUM_COMPLEX_BOUNDARY   = 0.3;
+const SIMPLE_MEDIUM_BOUNDARY = 0.0;
+const MEDIUM_COMPLEX_BOUNDARY = 0.3;
 const COMPLEX_REASONING_BOUNDARY = 0.5;
-const CONFIDENCE_STEEPNESS      = 12.0;
-const MAX_TOKENS_FORCE_COMPLEX  = 100_000;
+const CONFIDENCE_STEEPNESS = 12.0;
+const MAX_TOKENS_FORCE_COMPLEX = 100_000;
 
 export type Tier = "SIMPLE" | "MEDIUM" | "COMPLEX" | "REASONING";
 
@@ -129,10 +228,7 @@ function scoreKeywords(
   return [scoreNone, null];
 }
 
-export function classify(
-  prompt: string,
-  systemPrompt?: string,
-): ClassificationResult {
+export function classify(prompt: string, _systemPrompt?: string): ClassificationResult {
   const userText = prompt.toLowerCase();
 
   const estimatedTokens = Math.floor(userText.length / 4);
@@ -175,7 +271,16 @@ export function classify(
 
   // 4. Technical terms
   {
-    const [score, sig] = scoreKeywords(userText, TECHNICAL_KEYWORDS, 2, 4, 0, 0.5, 1.0, "technical");
+    const [score, sig] = scoreKeywords(
+      userText,
+      TECHNICAL_KEYWORDS,
+      2,
+      4,
+      0,
+      0.5,
+      1.0,
+      "technical",
+    );
     dimScores.technicalTerms = score;
     if (sig) signals.push(sig);
   }
@@ -216,21 +321,48 @@ export function classify(
 
   // 10. Constraint indicators
   {
-    const [score, sig] = scoreKeywords(userText, CONSTRAINT_INDICATORS, 1, 3, 0, 0.3, 0.7, "constraints");
+    const [score, sig] = scoreKeywords(
+      userText,
+      CONSTRAINT_INDICATORS,
+      1,
+      3,
+      0,
+      0.3,
+      0.7,
+      "constraints",
+    );
     dimScores.constraintCount = score;
     if (sig) signals.push(sig);
   }
 
   // 11. Output format keywords
   {
-    const [score, sig] = scoreKeywords(userText, OUTPUT_FORMAT_KEYWORDS, 1, 2, 0, 0.4, 0.7, "format");
+    const [score, sig] = scoreKeywords(
+      userText,
+      OUTPUT_FORMAT_KEYWORDS,
+      1,
+      2,
+      0,
+      0.4,
+      0.7,
+      "format",
+    );
     dimScores.outputFormat = score;
     if (sig) signals.push(sig);
   }
 
   // 12. Reference complexity
   {
-    const [score, sig] = scoreKeywords(userText, REFERENCE_KEYWORDS, 1, 2, 0, 0.3, 0.5, "references");
+    const [score, sig] = scoreKeywords(
+      userText,
+      REFERENCE_KEYWORDS,
+      1,
+      2,
+      0,
+      0.3,
+      0.5,
+      "references",
+    );
     dimScores.referenceComplexity = score;
     if (sig) signals.push(sig);
   }
@@ -244,7 +376,16 @@ export function classify(
 
   // 14. Domain specificity
   {
-    const [score, sig] = scoreKeywords(userText, DOMAIN_SPECIFIC_KEYWORDS, 1, 2, 0, 0.5, 0.8, "domain-specific");
+    const [score, sig] = scoreKeywords(
+      userText,
+      DOMAIN_SPECIFIC_KEYWORDS,
+      1,
+      2,
+      0,
+      0.5,
+      0.8,
+      "domain-specific",
+    );
     dimScores.domainSpecificity = score;
     if (sig) signals.push(sig);
   }
@@ -307,7 +448,9 @@ export function classify(
 
   if (complexitySignals >= 4 && (hasMultiStep || isLongPrompt)) {
     const conf = Math.max(sigmoid(weightedScore), 0.85);
-    signals.push(`complex override (${complexitySignals} signals: ${[...techMatches, ...imperativeMatches].slice(0, 3).join(", ")})`);
+    signals.push(
+      `complex override (${complexitySignals} signals: ${[...techMatches, ...imperativeMatches].slice(0, 3).join(", ")})`,
+    );
     return {
       tier: "COMPLEX",
       confidence: conf,
@@ -356,9 +499,9 @@ export function classify(
 export function tierFromModelId(modelId: string): Tier | undefined {
   const id = modelId.replace("claw-llm-router/", "").toLowerCase();
   const map: Record<string, Tier> = {
-    simple:    "SIMPLE",
-    medium:    "MEDIUM",
-    complex:   "COMPLEX",
+    simple: "SIMPLE",
+    medium: "MEDIUM",
+    complex: "COMPLEX",
     reasoning: "REASONING",
   };
   return map[id];
@@ -366,8 +509,8 @@ export function tierFromModelId(modelId: string): Tier | undefined {
 
 /** Fallback chain: if a tier fails, try the next one up */
 export const FALLBACK_CHAIN: Record<Tier, Tier[]> = {
-  SIMPLE:    ["SIMPLE", "MEDIUM", "COMPLEX"],
-  MEDIUM:    ["MEDIUM", "COMPLEX"],
-  COMPLEX:   ["COMPLEX", "REASONING"],
+  SIMPLE: ["SIMPLE", "MEDIUM", "COMPLEX"],
+  MEDIUM: ["MEDIUM", "COMPLEX"],
+  COMPLEX: ["COMPLEX", "REASONING"],
   REASONING: ["REASONING"],
 };

@@ -14,20 +14,13 @@
  * Entries auto-expire after 30 seconds.
  */
 
-const pendingOverrides = new Map<
-  string,
-  { model: string; provider: string; expires: number }
->();
+const pendingOverrides = new Map<string, { model: string; provider: string; expires: number }>();
 
 function makeKey(prompt: string): string {
   return prompt.slice(0, 500);
 }
 
-export function setPendingOverride(
-  prompt: string,
-  model: string,
-  provider: string,
-): void {
+export function setPendingOverride(prompt: string, model: string, provider: string): void {
   const key = makeKey(prompt);
   pendingOverrides.set(key, {
     model,
@@ -36,9 +29,7 @@ export function setPendingOverride(
   });
 }
 
-export function consumeOverride(
-  prompt: string,
-): { model: string; provider: string } | undefined {
+export function consumeOverride(prompt: string): { model: string; provider: string } | undefined {
   const key = makeKey(prompt);
   const entry = pendingOverrides.get(key);
   if (!entry) return undefined;
@@ -51,9 +42,7 @@ export function consumeOverride(
  * Extract the last user message from a chat completion request body.
  * Used to generate the override key.
  */
-export function extractUserPromptFromBody(
-  body: Record<string, unknown>,
-): string {
+export function extractUserPromptFromBody(body: Record<string, unknown>): string {
   const messages = (body.messages ?? []) as Array<{
     role: string;
     content: string | unknown;

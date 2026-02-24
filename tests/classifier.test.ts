@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { classify, tierFromModelId, FALLBACK_CHAIN, type Tier } from "../classifier.js";
+import { classify, tierFromModelId, FALLBACK_CHAIN } from "../classifier.js";
 
 describe("classify", () => {
   describe("tier boundaries", () => {
@@ -31,8 +31,8 @@ describe("classify", () => {
     it("classifies multi-file architecture as COMPLEX", () => {
       const result = classify(
         "Design a microservice architecture with Kubernetes for a distributed database system. " +
-        "Create the deployment configs, implement the service mesh, and set up monitoring. " +
-        "First create the base infrastructure, then deploy the services, and configure load balancing.",
+          "Create the deployment configs, implement the service mesh, and set up monitoring. " +
+          "First create the base infrastructure, then deploy the services, and configure load balancing.",
       );
       assert.ok(
         result.tier === "COMPLEX" || result.tier === "REASONING",
@@ -43,7 +43,7 @@ describe("classify", () => {
     it("classifies mathematical proofs as REASONING", () => {
       const result = classify(
         "Prove the theorem that for any prime p, the group Z/pZ is a field. " +
-        "Derive the proof step by step using formal logic and mathematical induction.",
+          "Derive the proof step by step using formal logic and mathematical induction.",
       );
       assert.equal(result.tier, "REASONING");
     });
@@ -53,8 +53,8 @@ describe("classify", () => {
     it("forces COMPLEX when many technical + imperative + agentic signals with multi-step", () => {
       const result = classify(
         "Build a distributed microservice architecture. First, design the database schema. " +
-        "Then create the API endpoints and deploy to Kubernetes. Configure the infrastructure " +
-        "and set up monitoring. Step 1: create the base. Step 2: implement services.",
+          "Then create the API endpoints and deploy to Kubernetes. Configure the infrastructure " +
+          "and set up monitoring. Step 1: create the base. Step 2: implement services.",
       );
       assert.ok(
         result.tier === "COMPLEX" || result.tier === "REASONING",
@@ -68,7 +68,10 @@ describe("classify", () => {
     it("scores on user text only (not system prompt)", () => {
       // The classifier should only score the user prompt, not system prompt
       const simpleResult = classify("hello");
-      const withSystemResult = classify("hello", "You are a complex system with many technical requirements");
+      const withSystemResult = classify(
+        "hello",
+        "You are a complex system with many technical requirements",
+      );
       // The tier should be the same regardless of system prompt
       assert.equal(simpleResult.tier, withSystemResult.tier);
     });
@@ -147,9 +150,11 @@ describe("tierFromModelId", () => {
   it("maps 'simple' to SIMPLE", () => assert.equal(tierFromModelId("simple"), "SIMPLE"));
   it("maps 'medium' to MEDIUM", () => assert.equal(tierFromModelId("medium"), "MEDIUM"));
   it("maps 'complex' to COMPLEX", () => assert.equal(tierFromModelId("complex"), "COMPLEX"));
-  it("maps 'reasoning' to REASONING", () => assert.equal(tierFromModelId("reasoning"), "REASONING"));
+  it("maps 'reasoning' to REASONING", () =>
+    assert.equal(tierFromModelId("reasoning"), "REASONING"));
   it("maps 'auto' to undefined", () => assert.equal(tierFromModelId("auto"), undefined));
-  it("strips claw-llm-router/ prefix", () => assert.equal(tierFromModelId("claw-llm-router/simple"), "SIMPLE"));
+  it("strips claw-llm-router/ prefix", () =>
+    assert.equal(tierFromModelId("claw-llm-router/simple"), "SIMPLE"));
   it("is case-insensitive", () => assert.equal(tierFromModelId("SIMPLE"), "SIMPLE"));
 });
 

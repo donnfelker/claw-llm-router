@@ -42,12 +42,12 @@ interface LLMProvider {
 
 Provider resolution:
 
-| Condition | Provider | How It Works |
-|-----------|----------|-------------|
-| Any provider + OAuth token | `GatewayProvider` | Routes through OpenClaw gateway (handles token refresh + API format) |
-| Any provider + OAuth + router is primary model | `gateway-with-override` | Gateway call with `before_model_resolve` hook to prevent recursion |
-| Anthropic + direct API key | `AnthropicProvider` | Converts OpenAI format to Anthropic Messages API |
-| All other providers | `OpenAICompatibleProvider` | POST to `{baseUrl}/chat/completions` with Bearer auth |
+| Condition                                      | Provider                   | How It Works                                                         |
+| ---------------------------------------------- | -------------------------- | -------------------------------------------------------------------- |
+| Any provider + OAuth token                     | `GatewayProvider`          | Routes through OpenClaw gateway (handles token refresh + API format) |
+| Any provider + OAuth + router is primary model | `gateway-with-override`    | Gateway call with `before_model_resolve` hook to prevent recursion   |
+| Anthropic + direct API key                     | `AnthropicProvider`        | Converts OpenAI format to Anthropic Messages API                     |
+| All other providers                            | `OpenAICompatibleProvider` | POST to `{baseUrl}/chat/completions` with Bearer auth                |
 
 ## OAuth Model Override (Recursion Prevention)
 

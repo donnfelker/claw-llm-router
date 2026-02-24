@@ -64,8 +64,8 @@ async function handleChatCompletion(
   //  2. Embedded system prompt: system instructions prepended to user text
   // We need to isolate the actual user text for accurate classification.
 
-  const isPackedContext = userPrompt.startsWith("[Chat messages since")
-    || userPrompt.startsWith("[chat messages since");
+  const isPackedContext =
+    userPrompt.startsWith("[Chat messages since") || userPrompt.startsWith("[chat messages since");
 
   let classifiablePrompt = userPrompt;
 
@@ -132,7 +132,11 @@ async function handleChatCompletion(
   } else if (isPackedContext && !classifiablePrompt) {
     tier = "MEDIUM";
     classificationMethod = "packed-default";
-    rlog.classify({ tier: "MEDIUM", method: "packed-default", detail: `(no current-message marker in ${userPrompt.length}-char packed context)` });
+    rlog.classify({
+      tier: "MEDIUM",
+      method: "packed-default",
+      detail: `(no current-message marker in ${userPrompt.length}-char packed context)`,
+    });
   } else {
     const result = classify(classifiablePrompt);
     tier = result.tier;
@@ -169,7 +173,12 @@ async function handleChatCompletion(
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       if (!(err instanceof MissingApiKeyError)) allMissingKeys = false;
-      rlog.fallback({ tier: attemptTier, provider: spec.provider, model: spec.modelId, error: lastError.message });
+      rlog.fallback({
+        tier: attemptTier,
+        provider: spec.provider,
+        model: spec.modelId,
+        error: lastError.message,
+      });
     }
   }
 
@@ -181,9 +190,11 @@ async function handleChatCompletion(
     const message = allMissingKeys
       ? `No API keys configured. Run /router doctor to see what's needed, or set API keys for your providers (e.g. GEMINI_API_KEY, ANTHROPIC_API_KEY). See: https://github.com/anthropics/claw-llm-router#setup`
       : `All providers failed: ${lastError?.message}`;
-    res.end(JSON.stringify({
-      error: { message, type: "router_error" },
-    }));
+    res.end(
+      JSON.stringify({
+        error: { message, type: "router_error" },
+      }),
+    );
   }
 }
 

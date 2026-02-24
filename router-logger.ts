@@ -24,7 +24,9 @@ export class RouterLogger {
     const ext = opts.extraction
       ? ` (extracted ${opts.extraction.to} chars from ${opts.extraction.from}-char message)`
       : "";
-    this.log.info(`${PREFIX} ── request ── model=${opts.model} stream=${opts.stream} prompt="${snippet}"${ext}`);
+    this.log.info(
+      `${PREFIX} ── request ── model=${opts.model} stream=${opts.stream} prompt="${snippet}"${ext}`,
+    );
   }
 
   /** Rule-based classification result */
@@ -52,7 +54,9 @@ export class RouterLogger {
     method: string;
     chain: string[];
   }): void {
-    this.log.info(`${PREFIX} route: tier=${opts.tier} → ${opts.provider}/${opts.model} (method=${opts.method}, chain=[${opts.chain.join(" → ")}])`);
+    this.log.info(
+      `${PREFIX} route: tier=${opts.tier} → ${opts.provider}/${opts.model} (method=${opts.method}, chain=[${opts.chain.join(" → ")}])`,
+    );
   }
 
   /** Provider selected for the call */
@@ -74,19 +78,24 @@ export class RouterLogger {
     tokensOut?: number | string;
   }): void {
     const mode = opts.streamed ? "streamed" : "complete";
-    const tokens = !opts.streamed && opts.tokensIn !== undefined
-      ? ` tokens=${opts.tokensIn}→${opts.tokensOut}`
-      : "";
+    const tokens =
+      !opts.streamed && opts.tokensIn !== undefined
+        ? ` tokens=${opts.tokensIn}→${opts.tokensOut}`
+        : "";
     this.log.info(`${PREFIX} done: ${opts.model} (${opts.via}, ${mode})${tokens}`);
   }
 
   /** A tier attempt failed, trying fallback */
   fallback(opts: { tier: string; provider: string; model: string; error: string }): void {
-    this.log.warn(`${PREFIX} fallback: ${opts.tier} ${opts.provider}/${opts.model} failed: ${opts.error}`);
+    this.log.warn(
+      `${PREFIX} fallback: ${opts.tier} ${opts.provider}/${opts.model} failed: ${opts.error}`,
+    );
   }
 
   /** All tiers exhausted */
   failed(opts: { chain: string[]; error: string }): void {
-    this.log.error(`${PREFIX} FAILED: all tiers exhausted [${opts.chain.join(" → ")}]. Last error: ${opts.error}`);
+    this.log.error(
+      `${PREFIX} FAILED: all tiers exhausted [${opts.chain.join(" → ")}]. Last error: ${opts.error}`,
+    );
   }
 }

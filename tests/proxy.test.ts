@@ -1,6 +1,5 @@
-import { describe, it, beforeEach, afterEach, mock } from "node:test";
+import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import http from "node:http";
 import { classify } from "../classifier.js";
 import { handleDoctorCommand } from "../index.js";
 import { getTierStrings, writeTierConfig } from "../tier-config.js";
@@ -8,34 +7,6 @@ import { MissingApiKeyError } from "../providers/index.js";
 
 // We test the proxy by starting it on a random port and making real HTTP requests.
 // Provider calls are mocked via globalThis.fetch.
-
-// Helper to make HTTP requests
-function request(
-  port: number,
-  method: string,
-  path: string,
-  body?: Record<string, unknown>,
-): Promise<{ status: number; body: string; headers: Record<string, string> }> {
-  return new Promise((resolve, reject) => {
-    const req = http.request(
-      { hostname: "127.0.0.1", port, path, method, headers: { "Content-Type": "application/json" } },
-      (res) => {
-        const chunks: Buffer[] = [];
-        res.on("data", (chunk) => chunks.push(chunk));
-        res.on("end", () => {
-          resolve({
-            status: res.statusCode ?? 0,
-            body: Buffer.concat(chunks).toString(),
-            headers: res.headers as Record<string, string>,
-          });
-        });
-      },
-    );
-    req.on("error", reject);
-    if (body) req.write(JSON.stringify(body));
-    req.end();
-  });
-}
 
 describe("Proxy Server", () => {
   // Note: We can't easily test the full proxy without mocking tier-config
@@ -232,13 +203,15 @@ describe("Proxy Server", () => {
     }
 
     it("strips Conversation info metadata wrapper", () => {
-      const wrapped = 'Conversation info (untrusted metadata): ```json { "message_id": "abc-123" }```\n\nWhat is the capital of France?';
+      const wrapped =
+        'Conversation info (untrusted metadata): ```json { "message_id": "abc-123" }```\n\nWhat is the capital of France?';
       const extracted = stripMetadata(wrapped);
       assert.equal(extracted, "What is the capital of France?");
     });
 
     it("classifies SIMPLE after stripping metadata with json/code keywords", () => {
-      const wrapped = 'Conversation info (untrusted metadata): ```json { "message_id": "abc-123" }```\n\nWhat is the capital of France?';
+      const wrapped =
+        'Conversation info (untrusted metadata): ```json { "message_id": "abc-123" }```\n\nWhat is the capital of France?';
       const extracted = stripMetadata(wrapped);
       const result = classify(extracted);
       assert.equal(result.tier, "SIMPLE");
@@ -253,8 +226,9 @@ describe("Proxy Server", () => {
   describe("Embedded system prompt stripping", () => {
     // Mirrors proxy.ts extraction logic for non-packed-context messages
     function extractClassifiable(userPrompt: string, systemPrompt: string): string {
-      const isPackedContext = userPrompt.startsWith("[Chat messages since")
-        || userPrompt.startsWith("[chat messages since");
+      const isPackedContext =
+        userPrompt.startsWith("[Chat messages since") ||
+        userPrompt.startsWith("[chat messages since");
       let classifiablePrompt = userPrompt;
 
       if (isPackedContext) {
@@ -284,27 +258,41 @@ describe("Proxy Server", () => {
     }
 
     it("strips embedded system prompt from user message", () => {
-      const sysPrompt = "You are Cato, a helpful assistant.\n\nRespond with ```json blocks when appropriate.";
+      const sysPrompt =
+        "You are Cato, a helpful assistant.\n\nRespond with ```json blocks when appropriate.";
       const userMsg = sysPrompt + "\n\n3+1";
       const extracted = extractClassifiable(userMsg, sysPrompt);
       assert.equal(extracted, "3+1");
     });
 
     it("classifies SIMPLE after stripping system prompt with code/json keywords", () => {
-      const sysPrompt = "You are a helpful AI assistant.\n\n## Response Format\nUse ```json or ```python blocks.\nAlways structure output as json when appropriate.";
+      const sysPrompt =
+        "You are a helpful AI assistant.\n\n## Response Format\nUse ```json or ```python blocks.\nAlways structure output as json when appropriate.";
       const userMsg = sysPrompt + "\n\n3+1";
 
       const extracted = extractClassifiable(userMsg, sysPrompt);
       const fullResult = classify(userMsg);
       const extractedResult = classify(extracted);
 
-      assert.equal(extractedResult.tier, "SIMPLE", "Should classify as SIMPLE after stripping system prompt");
-      assert.notEqual(fullResult.tier, "SIMPLE", "Full text with system prompt should NOT be SIMPLE");
+      assert.equal(
+        extractedResult.tier,
+        "SIMPLE",
+        "Should classify as SIMPLE after stripping system prompt",
+      );
+      assert.notEqual(
+        fullResult.tier,
+        "SIMPLE",
+        "Full text with system prompt should NOT be SIMPLE",
+      );
     });
 
     it("falls back to last paragraph when no separate system prompt and message is long", () => {
       // Simulate: system prompt embedded in user message with no separate system-role message
-      const embeddedSysPrompt = "You are Cato.\n\n## Tools\nUse exec and read tools for code.\n\n## Format\nUse ```json blocks.\n\n".padEnd(600, "x");
+      const embeddedSysPrompt =
+        "You are Cato.\n\n## Tools\nUse exec and read tools for code.\n\n## Format\nUse ```json blocks.\n\n".padEnd(
+          600,
+          "x",
+        );
       const userMsg = embeddedSysPrompt + "\n\nWhat is 2+2?";
       const extracted = extractClassifiable(userMsg, ""); // empty system prompt
       assert.equal(extracted, "What is 2+2?");
@@ -382,7 +370,7 @@ describe("Missing API key error handling", () => {
   it("allMissingKeys flag is false when at least one error is not MissingApiKeyError", () => {
     const errors: Error[] = [
       new MissingApiKeyError("google", "gemini-2.5-flash", "GEMINI_API_KEY"),
-      new Error("Connection refused"),  // non-key error
+      new Error("Connection refused"), // non-key error
     ];
 
     let allMissingKeys = true;

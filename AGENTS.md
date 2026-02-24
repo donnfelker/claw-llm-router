@@ -6,14 +6,16 @@ This is a **plugin for OpenClaw** — an AI chat application. The plugin acts as
 
 OpenClaw sends chat completion requests to the router, which classifies the prompt, selects the appropriate provider/model, and forwards the request. If a provider fails, the router falls back through a chain of higher-tier models.
 
-## Testing
+## Testing & Code Quality
 
-- All tests must pass before completing any task
-- Run all tests: `npx tsx --test tests/providers/*.test.ts tests/classifier.test.ts tests/proxy.test.ts tests/tier-config.test.ts`
-- Provider tests only: `npx tsx --test tests/providers/*.test.ts`
-- Classifier tests only: `npx tsx --test tests/classifier.test.ts`
-- Never commit with failing tests
-- Tests use Node.js built-in test runner (`node:test`) — no external deps
+- All checks must pass before completing any task
+- Run all checks: `npm run check` (format + lint + typecheck + tests)
+- Run tests only: `npm test`
+- Run formatting check: `npm run format` (fix with `npm run format:fix`)
+- Run linting: `npm run lint`
+- Run type checking: `npm run typecheck`
+- Never commit with failing checks
+- Tests use Node.js built-in test runner (`node:test`)
 - **Test context**: All test data should reflect realistic OpenClaw usage. Conversations are between `user` and `assistant` (the LLM) — not between named people (e.g., "Alice", "Bob"). Packed context uses OpenClaw's format: `[Chat messages since your last reply - for context]` with `user:`/`assistant:` prefixed messages, followed by `[Current message - respond to this]`.
 
 ## Project Structure

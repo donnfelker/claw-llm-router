@@ -18,10 +18,7 @@ import { envVarName } from "../tier-config.js";
 import { OpenAICompatibleProvider } from "./openai-compatible.js";
 import { AnthropicProvider } from "./anthropic.js";
 import { GatewayProvider } from "./gateway.js";
-import {
-  setPendingOverride,
-  extractUserPromptFromBody,
-} from "./model-override.js";
+import { setPendingOverride, extractUserPromptFromBody } from "./model-override.js";
 import { RouterLogger } from "../router-logger.js";
 
 const openaiCompatibleProvider = new OpenAICompatibleProvider();
@@ -58,7 +55,9 @@ function getIsRouterPrimary(): boolean {
 }
 
 // Refresh the cache periodically (every 30s) in case config changes
-const _cacheInterval = setInterval(() => { cachedIsRouterPrimary = undefined; }, 30_000);
+const _cacheInterval = setInterval(() => {
+  cachedIsRouterPrimary = undefined;
+}, 30_000);
 _cacheInterval.unref?.();
 
 /**
@@ -89,8 +88,8 @@ export class MissingApiKeyError extends Error {
   constructor(provider: string, modelId: string, envVar: string) {
     super(
       `No API key for ${provider}/${modelId}. ` +
-      `Set ${envVar} or run /auth to add ${provider} credentials. ` +
-      `Details: /router doctor`
+        `Set ${envVar} or run /auth to add ${provider} credentials. ` +
+        `Details: /router doctor`,
     );
     this.name = "MissingApiKeyError";
     this.provider = provider;

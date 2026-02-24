@@ -21,14 +21,15 @@ function convertMessages(messages: ChatMessage[]): {
   const converted: AnthropicMessage[] = [];
 
   for (const msg of messages) {
-    const content = typeof msg.content === "string"
-      ? msg.content
-      : Array.isArray(msg.content)
-        ? (msg.content as Array<{ type: string; text?: string }>)
-            .filter((c) => c.type === "text")
-            .map((c) => c.text ?? "")
-            .join("")
-        : String(msg.content ?? "");
+    const content =
+      typeof msg.content === "string"
+        ? msg.content
+        : Array.isArray(msg.content)
+          ? (msg.content as Array<{ type: string; text?: string }>)
+              .filter((c) => c.type === "text")
+              .map((c) => c.text ?? "")
+              .join("")
+          : String(msg.content ?? "");
 
     if (msg.role === "system") {
       systemParts.push(content);
@@ -45,10 +46,22 @@ function convertMessages(messages: ChatMessage[]): {
 
 // Remove OpenAI-only params that Anthropic doesn't accept
 const OPENAI_ONLY_PARAMS = new Set([
-  "n", "frequency_penalty", "presence_penalty", "logprobs",
-  "top_logprobs", "logit_bias", "response_format", "seed",
-  "service_tier", "tools", "tool_choice", "parallel_tool_calls",
-  "user", "store", "metadata", "stream_options",
+  "n",
+  "frequency_penalty",
+  "presence_penalty",
+  "logprobs",
+  "top_logprobs",
+  "logit_bias",
+  "response_format",
+  "seed",
+  "service_tier",
+  "tools",
+  "tool_choice",
+  "parallel_tool_calls",
+  "user",
+  "store",
+  "metadata",
+  "stream_options",
 ]);
 
 function buildAnthropicBody(
@@ -89,10 +102,14 @@ type AnthropicResponse = {
 
 function mapStopReason(reason: string | null): string {
   switch (reason) {
-    case "end_turn": return "stop";
-    case "max_tokens": return "length";
-    case "stop_sequence": return "stop";
-    default: return "stop";
+    case "end_turn":
+      return "stop";
+    case "max_tokens":
+      return "length";
+    case "stop_sequence":
+      return "stop";
+    default:
+      return "stop";
   }
 }
 
@@ -149,7 +166,7 @@ function buildStreamChunk(
 async function convertAnthropicStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   res: ServerResponse,
-  log: PluginLogger,
+  _log: PluginLogger,
 ): Promise<void> {
   const decoder = new TextDecoder();
   let buffer = "";

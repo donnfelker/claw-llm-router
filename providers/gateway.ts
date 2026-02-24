@@ -64,7 +64,7 @@ export class GatewayProvider implements LLMProvider {
     const resp = await fetch(url, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${gw.token}`,
+        Authorization: `Bearer ${gw.token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),

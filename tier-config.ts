@@ -163,11 +163,15 @@ export function loadApiKey(provider: string, log?: LogFn): ApiKeyResult {
 
       const result = parseProfileCredential(profile);
       if (result) {
-        log?.(`[auth] ${provider}: using key from auth-profiles.json (${profileName}${result.isOAuth ? ", OAuth" : ""})`);
+        log?.(
+          `[auth] ${provider}: using key from auth-profiles.json (${profileName}${result.isOAuth ? ", OAuth" : ""})`,
+        );
         return result;
       }
     }
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   // 3. auth.json (runtime cache)
   try {
@@ -179,7 +183,9 @@ export function loadApiKey(provider: string, log?: LogFn): ApiKeyResult {
       log?.(`[auth] ${provider}: using key from auth.json`);
       return { key, isOAuth: false };
     }
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   // 4. openclaw.json env.vars
   try {
@@ -190,9 +196,13 @@ export function loadApiKey(provider: string, log?: LogFn): ApiKeyResult {
       log?.(`[auth] ${provider}: using key from openclaw.json env.vars`);
       return { key: val, isOAuth: false };
     }
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
-  log?.(`[auth] ${provider}: NO API KEY FOUND (checked: env ${envKey}, auth-profiles.json, auth.json, openclaw.json env.vars)`);
+  log?.(
+    `[auth] ${provider}: NO API KEY FOUND (checked: env ${envKey}, auth-profiles.json, auth.json, openclaw.json env.vars)`,
+  );
   return { key: "", isOAuth: false };
 }
 
@@ -202,16 +212,22 @@ function resolveBaseUrl(provider: string): string {
   // First check openclaw.json models.providers for a configured baseUrl
   try {
     const config = readOpenClawConfig();
-    const models = config.models as { providers?: Record<string, { baseUrl?: string }> } | undefined;
+    const models = config.models as
+      | { providers?: Record<string, { baseUrl?: string }> }
+      | undefined;
     const providerConfig = models?.providers?.[provider];
     if (providerConfig?.baseUrl) return providerConfig.baseUrl;
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   // Fall back to well-known URLs
   const wellKnown = WELL_KNOWN_BASE_URLS[provider];
   if (wellKnown) return wellKnown;
 
-  throw new Error(`[claw-llm-router] Unknown provider "${provider}" — not in openclaw.json and no well-known URL. Configure it in openclaw.json models.providers or use /router set.`);
+  throw new Error(
+    `[claw-llm-router] Unknown provider "${provider}" — not in openclaw.json and no well-known URL. Configure it in openclaw.json models.providers or use /router set.`,
+  );
 }
 
 // ── Tier Model Resolution ────────────────────────────────────────────────────
@@ -219,7 +235,9 @@ function resolveBaseUrl(provider: string): string {
 export function resolveTierModel(tierString: string, log?: LogFn): TierModelSpec {
   const slashIdx = tierString.indexOf("/");
   if (slashIdx === -1) {
-    throw new Error(`[claw-llm-router] Invalid tier model format: "${tierString}" — expected "provider/model-id"`);
+    throw new Error(
+      `[claw-llm-router] Invalid tier model format: "${tierString}" — expected "provider/model-id"`,
+    );
   }
 
   const provider = tierString.slice(0, slashIdx);

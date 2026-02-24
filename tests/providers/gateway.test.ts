@@ -14,7 +14,12 @@ function makeLogger(): PluginLogger & { messages: string[] } {
   };
 }
 
-function makeRes(): ServerResponse & { _body: string; _statusCode: number; _headers: Record<string, string>; _ended: boolean } {
+function makeRes(): ServerResponse & {
+  _body: string;
+  _statusCode: number;
+  _headers: Record<string, string>;
+  _ended: boolean;
+} {
   const res = {
     _body: "",
     _statusCode: 0,
@@ -76,7 +81,12 @@ describe("GatewayProvider", () => {
 
     await provider.chatCompletion(
       { messages: [{ role: "user", content: "hello" }] },
-      { modelId: "claude-sonnet-4-6", apiKey: "sk-ant-oat01-test", baseUrl: "https://api.anthropic.com/v1", provider: "anthropic" } as any,
+      {
+        modelId: "claude-sonnet-4-6",
+        apiKey: "sk-ant-oat01-test",
+        baseUrl: "https://api.anthropic.com/v1",
+        provider: "anthropic",
+      } as any,
       false,
       res,
       log,
@@ -107,7 +117,12 @@ describe("GatewayProvider", () => {
 
     await provider.chatCompletion(
       { messages: [] },
-      { modelId: "claude-sonnet-4-6", apiKey: "sk-provider-key", baseUrl: "https://api.anthropic.com/v1", provider: "anthropic" } as any,
+      {
+        modelId: "claude-sonnet-4-6",
+        apiKey: "sk-provider-key",
+        baseUrl: "https://api.anthropic.com/v1",
+        provider: "anthropic",
+      } as any,
       false,
       res,
       log,
@@ -116,7 +131,10 @@ describe("GatewayProvider", () => {
     // Verify the Authorization header does NOT use the provider API key
     const fetchCall = (globalThis.fetch as any).mock.calls[0];
     const authHeader = fetchCall.arguments[1].headers["Authorization"];
-    assert.ok(!authHeader.includes("sk-provider-key"), "Should use gateway token, not provider key");
+    assert.ok(
+      !authHeader.includes("sk-provider-key"),
+      "Should use gateway token, not provider key",
+    );
   });
 
   it("logs warning on first use only", async () => {
@@ -151,7 +169,9 @@ describe("GatewayProvider", () => {
       log,
     );
 
-    const warnings = log.messages.filter((m) => m.startsWith("WARN:") && m.includes("gateway fallback"));
+    const warnings = log.messages.filter(
+      (m) => m.startsWith("WARN:") && m.includes("gateway fallback"),
+    );
     assert.equal(warnings.length, 1, "Should only warn once");
   });
 

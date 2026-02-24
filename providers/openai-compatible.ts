@@ -17,12 +17,27 @@ import { RouterLogger } from "../router-logger.js";
 // Non-standard or provider-specific fields (e.g. `store`, `metadata`) are stripped
 // to avoid 400 errors from providers like Google Gemini.
 const ALLOWED_PARAMS = new Set([
-  "messages", "model", "stream",
-  "max_tokens", "max_completion_tokens", "temperature", "top_p",
-  "n", "stop", "presence_penalty", "frequency_penalty",
-  "logit_bias", "logprobs", "top_logprobs",
-  "response_format", "seed", "tools", "tool_choice",
-  "parallel_tool_calls", "user", "stream_options",
+  "messages",
+  "model",
+  "stream",
+  "max_tokens",
+  "max_completion_tokens",
+  "temperature",
+  "top_p",
+  "n",
+  "stop",
+  "presence_penalty",
+  "frequency_penalty",
+  "logit_bias",
+  "logprobs",
+  "top_logprobs",
+  "response_format",
+  "seed",
+  "tools",
+  "tool_choice",
+  "parallel_tool_calls",
+  "user",
+  "stream_options",
   "service_tier",
 ]);
 
@@ -52,7 +67,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
     const resp = await fetch(url, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${spec.apiKey}`,
+        Authorization: `Bearer ${spec.apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),

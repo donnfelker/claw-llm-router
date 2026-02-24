@@ -128,9 +128,7 @@ describe("resolveProvider", () => {
       }),
     );
     // Either gateway or gateway-with-override depending on primary model config
-    assert.ok(
-      provider instanceof GatewayProvider || provider.name === "gateway-with-override",
-    );
+    assert.ok(provider instanceof GatewayProvider || provider.name === "gateway-with-override");
   });
 
   // ── MoonShot provider tests ──────────────────────────────────────────────────
@@ -152,9 +150,7 @@ describe("resolveProvider", () => {
   // ── General edge cases ──────────────────────────────────────────────────────
 
   it("returns OpenAICompatibleProvider for unknown providers", () => {
-    const provider = resolveProvider(
-      makeSpec({ provider: "custom-provider", isAnthropic: false }),
-    );
+    const provider = resolveProvider(makeSpec({ provider: "custom-provider", isAnthropic: false }));
     assert.ok(provider instanceof OpenAICompatibleProvider);
   });
 
@@ -179,9 +175,7 @@ describe("resolveProvider", () => {
         isOAuth: true,
       }),
     );
-    assert.ok(
-      provider instanceof GatewayProvider || provider.name === "gateway-with-override",
-    );
+    assert.ok(provider instanceof GatewayProvider || provider.name === "gateway-with-override");
   });
 
   // ── MissingApiKeyError: fail-fast when apiKey is empty ──────────────────────
@@ -218,7 +212,10 @@ describe("resolveProvider", () => {
       await callProvider(spec, { messages: [] }, false, res, log);
     } catch (err) {
       // Should NOT be a MissingApiKeyError
-      assert.ok(!(err instanceof MissingApiKeyError), "Should not throw MissingApiKeyError when key is present");
+      assert.ok(
+        !(err instanceof MissingApiKeyError),
+        "Should not throw MissingApiKeyError when key is present",
+      );
     }
   });
 
@@ -239,8 +236,6 @@ describe("resolveProvider", () => {
       !(provider instanceof AnthropicProvider),
       "OAuth token must not go to AnthropicProvider — would fail with 401 invalid x-api-key",
     );
-    assert.ok(
-      provider instanceof GatewayProvider || provider.name === "gateway-with-override",
-    );
+    assert.ok(provider instanceof GatewayProvider || provider.name === "gateway-with-override");
   });
 });

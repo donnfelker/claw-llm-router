@@ -25,7 +25,7 @@ describe("RouterLogger", () => {
 
       assert.equal(messages.length, 1);
       assert.equal(messages[0].level, "info");
-      assert.ok(messages[0].msg.startsWith("[router]"));
+      assert.ok(messages[0].msg.startsWith("[claw-llm-router]"));
       assert.ok(messages[0].msg.includes("model=auto"));
       assert.ok(messages[0].msg.includes("stream=true"));
       assert.ok(messages[0].msg.includes('prompt="Hello world"'));
@@ -83,7 +83,7 @@ describe("RouterLogger", () => {
       rlog.classify({ tier: "SIMPLE", method: "forced" });
 
       assert.equal(messages.length, 1);
-      assert.ok(messages[0].msg.includes("[router] classify:"));
+      assert.ok(messages[0].msg.includes("[claw-llm-router] classify:"));
       assert.ok(messages[0].msg.includes("tier=SIMPLE"));
       assert.ok(messages[0].msg.includes("method=forced"));
     });
@@ -151,7 +151,7 @@ describe("RouterLogger", () => {
         chain: ["SIMPLE", "MEDIUM", "COMPLEX", "REASONING"],
       });
 
-      assert.ok(messages[0].msg.includes("[router] route:"));
+      assert.ok(messages[0].msg.includes("[claw-llm-router] route:"));
       assert.ok(messages[0].msg.includes("tier=SIMPLE"));
       assert.ok(messages[0].msg.includes("google/gemini-2.5-flash"));
       assert.ok(messages[0].msg.includes("method=rule-based"));
@@ -167,7 +167,7 @@ describe("RouterLogger", () => {
       const rlog = new RouterLogger(log);
       rlog.provider({ name: "openai-compatible", provider: "google", model: "gemini-2.5-flash" });
 
-      assert.ok(messages[0].msg.includes("[router] provider:"));
+      assert.ok(messages[0].msg.includes("[claw-llm-router] provider:"));
       assert.ok(messages[0].msg.includes("openai-compatible"));
       assert.ok(messages[0].msg.includes("google/gemini-2.5-flash"));
     });
@@ -181,7 +181,7 @@ describe("RouterLogger", () => {
       const rlog = new RouterLogger(log);
       rlog.override({ provider: "anthropic", model: "claude-sonnet-4-6" });
 
-      assert.ok(messages[0].msg.includes("[router] override:"));
+      assert.ok(messages[0].msg.includes("[claw-llm-router] override:"));
       assert.ok(messages[0].msg.includes("anthropic/claude-sonnet-4-6"));
     });
   });
@@ -194,7 +194,7 @@ describe("RouterLogger", () => {
       const rlog = new RouterLogger(log);
       rlog.done({ model: "gemini-2.5-flash", via: "direct", streamed: true });
 
-      assert.ok(messages[0].msg.includes("[router] done:"));
+      assert.ok(messages[0].msg.includes("[claw-llm-router] done:"));
       assert.ok(messages[0].msg.includes("gemini-2.5-flash"));
       assert.ok(messages[0].msg.includes("direct"));
       assert.ok(messages[0].msg.includes("streamed"));
@@ -204,7 +204,13 @@ describe("RouterLogger", () => {
     it("logs non-streamed completion with tokens", () => {
       const { messages, log } = makeCapture();
       const rlog = new RouterLogger(log);
-      rlog.done({ model: "gemini-2.5-flash", via: "direct", streamed: false, tokensIn: 150, tokensOut: 42 });
+      rlog.done({
+        model: "gemini-2.5-flash",
+        via: "direct",
+        streamed: false,
+        tokensIn: 150,
+        tokensOut: 42,
+      });
 
       assert.ok(messages[0].msg.includes("complete"));
       assert.ok(messages[0].msg.includes("tokens=150→42"));
@@ -225,10 +231,15 @@ describe("RouterLogger", () => {
     it("logs warning with tier, provider, and error", () => {
       const { messages, log } = makeCapture();
       const rlog = new RouterLogger(log);
-      rlog.fallback({ tier: "SIMPLE", provider: "google", model: "gemini-2.5-flash", error: "connection refused" });
+      rlog.fallback({
+        tier: "SIMPLE",
+        provider: "google",
+        model: "gemini-2.5-flash",
+        error: "connection refused",
+      });
 
       assert.equal(messages[0].level, "warn");
-      assert.ok(messages[0].msg.includes("[router] fallback:"));
+      assert.ok(messages[0].msg.includes("[claw-llm-router] fallback:"));
       assert.ok(messages[0].msg.includes("SIMPLE"));
       assert.ok(messages[0].msg.includes("google/gemini-2.5-flash"));
       assert.ok(messages[0].msg.includes("connection refused"));
@@ -244,7 +255,7 @@ describe("RouterLogger", () => {
       rlog.failed({ chain: ["SIMPLE", "MEDIUM", "COMPLEX"], error: "all timed out" });
 
       assert.equal(messages[0].level, "error");
-      assert.ok(messages[0].msg.includes("[router] FAILED:"));
+      assert.ok(messages[0].msg.includes("[claw-llm-router] FAILED:"));
       assert.ok(messages[0].msg.includes("[SIMPLE → MEDIUM → COMPLEX]"));
       assert.ok(messages[0].msg.includes("all timed out"));
     });

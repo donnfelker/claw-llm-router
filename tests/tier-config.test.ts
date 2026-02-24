@@ -1,4 +1,4 @@
-import { describe, it, beforeEach, afterEach } from "node:test";
+import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { loadApiKey, parseProfileCredential } from "../tier-config.js";
 
@@ -77,7 +77,11 @@ describe("parseProfileCredential", () => {
     });
     assert.ok(result, "Should return a result");
     assert.equal(result.key, "sk-ant-oat01-real-oauth-token-here");
-    assert.equal(result.isOAuth, true, "Must detect OAuth by sk-ant-oat01- prefix even when type is 'token'");
+    assert.equal(
+      result.isOAuth,
+      true,
+      "Must detect OAuth by sk-ant-oat01- prefix even when type is 'token'",
+    );
   });
 
   it("returns isOAuth=false for Anthropic direct API key with type:'token'", () => {

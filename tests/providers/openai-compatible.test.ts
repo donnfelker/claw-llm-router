@@ -14,7 +14,12 @@ function makeLogger(): PluginLogger & { messages: string[] } {
   };
 }
 
-function makeRes(): ServerResponse & { _body: string; _statusCode: number; _headers: Record<string, string>; _ended: boolean } {
+function makeRes(): ServerResponse & {
+  _body: string;
+  _statusCode: number;
+  _headers: Record<string, string>;
+  _ended: boolean;
+} {
   const res = {
     _body: "",
     _statusCode: 0,
@@ -65,7 +70,9 @@ describe("OpenAICompatibleProvider", () => {
       id: "chatcmpl-test",
       object: "chat.completion",
       model: "gemini-2.5-flash",
-      choices: [{ index: 0, message: { role: "assistant", content: "Hello!" }, finish_reason: "stop" }],
+      choices: [
+        { index: 0, message: { role: "assistant", content: "Hello!" }, finish_reason: "stop" },
+      ],
       usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 },
     };
 
