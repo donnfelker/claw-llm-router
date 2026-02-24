@@ -9,7 +9,7 @@ import {
   mapStopReason,
   buildStreamChunk,
 } from "../../providers/anthropic.js";
-import type { PluginLogger, ChatMessage } from "../../providers/types.js";
+import { REQUEST_TIMEOUT_MS, type PluginLogger, type ChatMessage } from "../../providers/types.js";
 
 function makeLogger(): PluginLogger & { messages: string[] } {
   const messages: string[] = [];
@@ -380,6 +380,71 @@ describe("AnthropicProvider", () => {
       (err: Error) => {
         assert.ok(err.message.includes("401"));
         assert.ok(err.message.includes("Invalid API key"));
+        return true;
+      },
+    );
+  });
+
+  it("passes an AbortSignal to fetch", async () => {
+    globalThis.fetch = mock.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        id: "msg_test",
+        type: "message",
+        role: "assistant",
+        content: [{ type: "text", text: "Hi" }],
+        model: "claude-sonnet-4-6",
+        stop_reason: "end_turn",
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }),
+    })) as any;
+
+    const log = makeLogger();
+    const res = makeRes();
+
+    await provider.chatCompletion(
+      { messages: [{ role: "user", content: "hi" }] },
+      {
+        modelId: "claude-sonnet-4-6",
+        apiKey: "sk-ant-test",
+        baseUrl: "https://api.anthropic.com/v1",
+      },
+      false,
+      res,
+      log,
+    );
+
+    const fetchOpts = (globalThis.fetch as any).mock.calls[0].arguments[1];
+    assert.ok(fetchOpts.signal instanceof AbortSignal, "fetch should receive an AbortSignal");
+  });
+
+  it("converts AbortError to descriptive timeout message", async () => {
+    const abortError = new DOMException("The operation was aborted", "AbortError");
+    globalThis.fetch = mock.fn(async () => {
+      throw abortError;
+    }) as any;
+
+    const log = makeLogger();
+    const res = makeRes();
+
+    await assert.rejects(
+      () =>
+        provider.chatCompletion(
+          { messages: [{ role: "user", content: "hello" }] },
+          {
+            modelId: "claude-sonnet-4-6",
+            apiKey: "sk-ant-test",
+            baseUrl: "https://api.anthropic.com/v1",
+          },
+          false,
+          res,
+          log,
+        ),
+      (err: Error) => {
+        assert.ok(err.message.includes("claude-sonnet-4-6"), "should include model ID");
+        assert.ok(err.message.includes("timed out"), "should say timed out");
+        assert.ok(err.message.includes(String(REQUEST_TIMEOUT_MS)), "should include timeout value");
+        assert.equal(err.name, "Error", "should be a plain Error, not AbortError");
         return true;
       },
     );

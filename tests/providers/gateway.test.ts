@@ -2,7 +2,7 @@ import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import type { ServerResponse } from "node:http";
 import { GatewayProvider, resetGatewayWarning } from "../../providers/gateway.js";
-import type { PluginLogger } from "../../providers/types.js";
+import { REQUEST_TIMEOUT_MS, type PluginLogger } from "../../providers/types.js";
 
 function makeLogger(): PluginLogger & { messages: string[] } {
   const messages: string[] = [];
@@ -237,5 +237,59 @@ describe("GatewayProvider", () => {
     assert.equal(res._headers["Content-Type"], "text/event-stream");
     assert.ok(res._body.includes("data:"));
     assert.ok(res.writableEnded);
+  });
+
+  it("passes an AbortSignal to fetch", async () => {
+    globalThis.fetch = mock.fn(async () => ({
+      ok: true,
+      json: async () => ({ choices: [], usage: {} }),
+    })) as any;
+
+    const log = makeLogger();
+    const res = makeRes();
+
+    await provider.chatCompletion(
+      { messages: [] },
+      { modelId: "claude-sonnet-4-6", apiKey: "key", baseUrl: "url", provider: "anthropic" } as any,
+      false,
+      res,
+      log,
+    );
+
+    const fetchOpts = (globalThis.fetch as any).mock.calls[0].arguments[1];
+    assert.ok(fetchOpts.signal instanceof AbortSignal, "fetch should receive an AbortSignal");
+  });
+
+  it("converts AbortError to descriptive timeout message", async () => {
+    const abortError = new DOMException("The operation was aborted", "AbortError");
+    globalThis.fetch = mock.fn(async () => {
+      throw abortError;
+    }) as any;
+
+    const log = makeLogger();
+    const res = makeRes();
+
+    await assert.rejects(
+      () =>
+        provider.chatCompletion(
+          { messages: [] },
+          {
+            modelId: "claude-sonnet-4-6",
+            apiKey: "key",
+            baseUrl: "url",
+            provider: "anthropic",
+          } as any,
+          false,
+          res,
+          log,
+        ),
+      (err: Error) => {
+        assert.ok(err.message.includes("Gateway"), "should include Gateway prefix");
+        assert.ok(err.message.includes("timed out"), "should say timed out");
+        assert.ok(err.message.includes(String(REQUEST_TIMEOUT_MS)), "should include timeout value");
+        assert.equal(err.name, "Error", "should be a plain Error, not AbortError");
+        return true;
+      },
+    );
   });
 });
