@@ -31,6 +31,8 @@ flowchart TD
 
 ### The Four Tiers
 
+Each tier maps to a model. These are the defaults — you can point any tier at any supported provider/model with `/router set`:
+
 | Tier          | Default Model                         | When It's Used                                                                   |
 | ------------- | ------------------------------------- | -------------------------------------------------------------------------------- |
 | **SIMPLE**    | `google/gemini-2.5-flash`             | Factual lookups, definitions, translations, greetings, yes/no, simple math       |
@@ -38,7 +40,26 @@ flowchart TD
 | **COMPLEX**   | `anthropic/claude-sonnet-4-6`         | Multi-file code, architecture, long-form analysis, detailed technical work       |
 | **REASONING** | `anthropic/claude-opus-4-6`           | Mathematical proofs, formal logic, multi-step derivations, deep chain-of-thought |
 
-Every tier is configurable. Any OpenAI-compatible provider works, plus Anthropic's native Messages API.
+### Supported Providers
+
+The router works with any OpenAI-compatible API out of the box, plus Anthropic's native Messages API. These providers have built-in support (no base URL configuration needed):
+
+| Provider   | Environment Variable | Example Models                                       |
+| ---------- | -------------------- | ---------------------------------------------------- |
+| Anthropic  | `ANTHROPIC_API_KEY`  | claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5 |
+| Google     | `GEMINI_API_KEY`     | gemini-2.5-flash, gemini-2.5-pro                     |
+| OpenAI     | `OPENAI_API_KEY`     | gpt-4o, gpt-4o-mini, o1, o3-mini                     |
+| Groq       | `GROQ_API_KEY`       | llama-3.3-70b, mixtral-8x7b                          |
+| Mistral    | `MISTRAL_API_KEY`    | mistral-large, mistral-small                         |
+| DeepSeek   | `DEEPSEEK_API_KEY`   | deepseek-chat, deepseek-reasoner                     |
+| xAI        | `XAI_API_KEY`        | grok-2, grok-3                                       |
+| Together   | `TOGETHER_API_KEY`   | meta-llama/Llama-3.3-70B-Instruct                    |
+| Fireworks  | `FIREWORKS_API_KEY`  | accounts/fireworks/models/llama-v3p3-70b-instruct    |
+| Perplexity | `PERPLEXITY_API_KEY` | sonar, sonar-pro                                     |
+| MiniMax    | via `/auth`          | MiniMax-Text-01                                      |
+| MoonShot   | `MOONSHOT_API_KEY`   | moonshot-v1-auto                                     |
+
+Any other OpenAI-compatible provider can be added by configuring a custom base URL in `~/.openclaw/openclaw.json`. See [docs/PROVIDERS.md](docs/PROVIDERS.md) for the full guide on adding new providers.
 
 ### Classification
 
@@ -95,17 +116,7 @@ openclaw plugins install -l ./claw-llm-router
 
 ### 2. Set up API keys
 
-The router needs at least one provider API key. Set keys for the providers you want to use:
-
-| Provider  | Environment Variable                     | Tier Suggestion            |
-| --------- | ---------------------------------------- | -------------------------- |
-| Google    | `GEMINI_API_KEY`                         | SIMPLE                     |
-| Anthropic | `ANTHROPIC_API_KEY` or OAuth via `/auth` | MEDIUM, COMPLEX, REASONING |
-| OpenAI    | `OPENAI_API_KEY`                         | MEDIUM, COMPLEX            |
-| Groq      | `GROQ_API_KEY`                           | SIMPLE                     |
-| xAI       | `XAI_API_KEY`                            | MEDIUM                     |
-
-You can also add credentials through OpenClaw's `/auth` command.
+The router needs at least one provider API key. Set environment variables for the providers you want to use (see [Supported Providers](#supported-providers) for the full list), or add credentials through OpenClaw's `/auth` command.
 
 > **Tip:** At minimum, set `GEMINI_API_KEY` for the SIMPLE tier and authenticate Anthropic via `/auth` for the other tiers. This covers all four tiers.
 
@@ -325,7 +336,6 @@ npx tsx --test tests/providers/*.test.ts
 # Classifier tests only
 npx tsx --test tests/classifier.test.ts
 ```
-
 
 ## Adding a New Provider
 
