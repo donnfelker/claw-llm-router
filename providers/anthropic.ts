@@ -6,7 +6,12 @@
  */
 
 import type { ServerResponse } from "node:http";
-import type { LLMProvider, PluginLogger, ChatMessage } from "./types.js";
+import {
+  REQUEST_TIMEOUT_MS,
+  type LLMProvider,
+  type PluginLogger,
+  type ChatMessage,
+} from "./types.js";
 import { RouterLogger } from "../router-logger.js";
 
 // ── OpenAI → Anthropic request conversion ────────────────────────────────────
@@ -265,45 +270,60 @@ export class AnthropicProvider implements LLMProvider {
 
     const url = `${spec.baseUrl}/messages`;
 
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: {
-        "x-api-key": spec.apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(anthropicBody),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-    if (!resp.ok) {
-      const errText = await resp.text();
-      throw new Error(`Anthropic ${spec.modelId} ${resp.status}: ${errText.slice(0, 300)}`);
-    }
-
-    const rlog = new RouterLogger(log);
-
-    if (stream) {
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        "X-Accel-Buffering": "no",
+    try {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: {
+          "x-api-key": spec.apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(anthropicBody),
+        signal: controller.signal,
       });
-      const reader = resp.body?.getReader();
-      if (!reader) throw new Error(`No response body from Anthropic ${spec.modelId}`);
-      await convertAnthropicStream(reader, res, log);
-      rlog.done({ model: spec.modelId, via: "anthropic", streamed: true });
-    } else {
-      const data = (await resp.json()) as AnthropicResponse;
-      const openaiResponse = toOpenAIResponse(data);
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(openaiResponse));
-      rlog.done({
-        model: spec.modelId,
-        via: "anthropic",
-        streamed: false,
-        tokensIn: data.usage.input_tokens,
-        tokensOut: data.usage.output_tokens,
-      });
+
+      if (!resp.ok) {
+        const errText = await resp.text();
+        throw new Error(`Anthropic ${spec.modelId} ${resp.status}: ${errText.slice(0, 300)}`);
+      }
+
+      const rlog = new RouterLogger(log);
+
+      if (stream) {
+        res.writeHead(200, {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "X-Accel-Buffering": "no",
+        });
+        const reader = resp.body?.getReader();
+        if (!reader) throw new Error(`No response body from Anthropic ${spec.modelId}`);
+        await convertAnthropicStream(reader, res, log);
+        rlog.done({ model: spec.modelId, via: "anthropic", streamed: true });
+      } else {
+        const data = (await resp.json()) as AnthropicResponse;
+        const openaiResponse = toOpenAIResponse(data);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(openaiResponse));
+        rlog.done({
+          model: spec.modelId,
+          via: "anthropic",
+          streamed: false,
+          tokensIn: data.usage.input_tokens,
+          tokensOut: data.usage.output_tokens,
+        });
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        throw new Error(
+          `Anthropic ${spec.modelId} request timed out after ${REQUEST_TIMEOUT_MS}ms`,
+        );
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 }

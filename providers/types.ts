@@ -14,6 +14,9 @@ export type PluginLogger = {
 
 export type ChatMessage = { role: string; content: string | unknown };
 
+/** Default timeout for outbound provider requests (3 minutes). */
+export const REQUEST_TIMEOUT_MS = 180_000;
+
 export interface LLMProvider {
   readonly name: string;
   chatCompletion(

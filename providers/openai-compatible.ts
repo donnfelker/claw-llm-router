@@ -10,7 +10,7 @@
  */
 
 import type { ServerResponse } from "node:http";
-import type { LLMProvider, PluginLogger } from "./types.js";
+import { REQUEST_TIMEOUT_MS, type LLMProvider, type PluginLogger } from "./types.js";
 import { RouterLogger } from "../router-logger.js";
 
 // Standard OpenAI chat completion parameters that providers generally accept.
@@ -64,50 +64,63 @@ export class OpenAICompatibleProvider implements LLMProvider {
     const url = `${spec.baseUrl}/chat/completions`;
     const payload = { ...sanitizeBody(body), model: spec.modelId, stream };
 
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${spec.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-    if (!resp.ok) {
-      const errText = await resp.text();
-      throw new Error(`${spec.modelId} ${resp.status}: ${errText.slice(0, 300)}`);
-    }
-
-    const rlog = new RouterLogger(log);
-
-    if (stream) {
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        "X-Accel-Buffering": "no",
+    try {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${spec.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
       });
-      const reader = resp.body?.getReader();
-      if (!reader) throw new Error(`No response body from ${spec.modelId}`);
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (!res.writableEnded) res.write(decoder.decode(value, { stream: true }));
+
+      if (!resp.ok) {
+        const errText = await resp.text();
+        throw new Error(`${spec.modelId} ${resp.status}: ${errText.slice(0, 300)}`);
       }
-      if (!res.writableEnded) res.end();
-      rlog.done({ model: spec.modelId, via: "direct", streamed: true });
-    } else {
-      const data = (await resp.json()) as Record<string, unknown>;
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(data));
-      const usage = (data.usage ?? {}) as Record<string, number>;
-      rlog.done({
-        model: spec.modelId,
-        via: "direct",
-        streamed: false,
-        tokensIn: usage.prompt_tokens ?? "?",
-        tokensOut: usage.completion_tokens ?? "?",
-      });
+
+      const rlog = new RouterLogger(log);
+
+      if (stream) {
+        res.writeHead(200, {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "X-Accel-Buffering": "no",
+        });
+        const reader = resp.body?.getReader();
+        if (!reader) throw new Error(`No response body from ${spec.modelId}`);
+        const decoder = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (!res.writableEnded) res.write(decoder.decode(value, { stream: true }));
+        }
+        if (!res.writableEnded) res.end();
+        rlog.done({ model: spec.modelId, via: "direct", streamed: true });
+      } else {
+        const data = (await resp.json()) as Record<string, unknown>;
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(data));
+        const usage = (data.usage ?? {}) as Record<string, number>;
+        rlog.done({
+          model: spec.modelId,
+          via: "direct",
+          streamed: false,
+          tokensIn: usage.prompt_tokens ?? "?",
+          tokensOut: usage.completion_tokens ?? "?",
+        });
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        throw new Error(`${spec.modelId} request timed out after ${REQUEST_TIMEOUT_MS}ms`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 }
