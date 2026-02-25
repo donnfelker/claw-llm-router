@@ -7,7 +7,7 @@ An [OpenClaw](https://openclaw.ai) plugin that cuts LLM costs **40–80%** by cl
 ## Table of Contents
 
 - [How It Works](#how-it-works) — tiers, providers, classification, fallback chain
-- [Quickstart / Install](#quickstart) — install, API keys, gateway restart, primary model setup
+- [Quickstart / Install](#quickstart) — API keys, install, gateway restart, primary model setup
 - [Usage](#usage) — `/router` command, model selection, curl examples, endpoints
 - [Troubleshooting](#troubleshooting) — doctor, config backup & restore, disable/uninstall
 - [Testing](#testing)
@@ -18,6 +18,33 @@ An [OpenClaw](https://openclaw.ai) plugin that cuts LLM costs **40–80%** by cl
 LLM costs add up fast when every prompt hits a frontier model. Most prompts don't need one. "What is the capital of France?" doesn't need Claude Opus — Gemini Flash answers it for 100x less. The router makes this automatic: you interact with a single model (`claw-llm-router/auto`) and the classifier picks the right backend.
 
 ## How It Works
+
+The router runs as a **local HTTP proxy** inside the OpenClaw gateway process on port 8401. When you set it as the primary model, OpenClaw sends all chat completion requests to the router instead of directly to a provider. The router then:
+
+1. **Classifies** the prompt locally using a rule-based scorer (no external API calls, <1ms)
+2. **Picks a tier** (SIMPLE, MEDIUM, COMPLEX, or REASONING) based on the score
+3. **Forwards** the request to the provider/model assigned to that tier using your API keys
+4. **Falls back** to a higher tier if the chosen provider fails
+
+The result: simple prompts go to cheap models, complex prompts go to capable ones, and you don't have to think about it.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant OpenClaw as OpenClaw Gateway
+    participant Router as Router Proxy (port 8401)
+    participant Provider as LLM Provider
+
+    User->>OpenClaw: Send message
+    OpenClaw->>Router: POST /v1/chat/completions
+    Router->>Router: Classify prompt → pick tier
+    Router->>Provider: Forward to tier's provider/model
+    Provider-->>Router: Stream response
+    Router-->>OpenClaw: Pipe response
+    OpenClaw-->>User: Display response
+```
+
+### Routing
 
 ```mermaid
 flowchart TD
@@ -113,7 +140,48 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for provider strategy, resoluti
 
 ## Quickstart
 
-### 1. Install the plugin
+### 1. Set up API keys
+
+Set up your provider API keys **before** installing the plugin. The router modifies `~/.openclaw/openclaw.json` at startup, and without valid keys in place the system can end up in a broken state. See [Config Backup & Restore](#config-backup--restore) if you need to recover.
+
+A simple starting config is Google Gemini for the SIMPLE tier (cheap, fast) and Anthropic for everything else:
+
+| Tier                       | Default Provider | Key Needed          |
+| -------------------------- | ---------------- | ------------------- |
+| SIMPLE                     | Google           | `GEMINI_API_KEY`    |
+| MEDIUM, COMPLEX, REASONING | Anthropic        | `ANTHROPIC_API_KEY` |
+
+This is fully configurable — you can point any tier at any [supported provider](#supported-providers) with `/router set` (see [Configure Tiers](#configure-tiers)).
+
+The router picks up API keys from several sources. These are listed in order of what's easiest to set up:
+
+**Option A: `openclaw onboard`** (recommended)
+
+If you haven't set up providers yet, run `openclaw onboard` — it walks you through configuring provider credentials interactively. The router picks up any credentials configured this way automatically.
+
+**Option B: `openclaw.json` env section**
+
+Add your keys to the `env` block in `~/.openclaw/openclaw.json`. You can place keys directly under `env` or nested under `env.vars` — both work:
+
+```json5
+{
+  env: {
+    GEMINI_API_KEY: "your-google-api-key",
+    ANTHROPIC_API_KEY: "your-anthropic-api-key",
+  },
+}
+```
+
+**Option C: Environment variables**
+
+As a fallback, you can set environment variables in your shell profile (`~/.bashrc`, `~/.zshrc`, etc.):
+
+```bash
+export GEMINI_API_KEY="your-google-api-key"
+export ANTHROPIC_API_KEY="your-anthropic-api-key"
+```
+
+### 2. Install the plugin
 
 ```bash
 openclaw plugins install claw-llm-router
@@ -125,17 +193,9 @@ Or install from a local directory during development:
 openclaw plugins install -l ./claw-llm-router
 ```
 
-> **Important:** Do **not** restart the gateway yet — configure your API keys first (step 2). When the gateway starts, the router plugin modifies `~/.openclaw/openclaw.json` to register itself as a provider. If the configuration is incomplete, this can leave the system in a broken state. See [Config Backup & Restore](#config-backup--restore) if you need to recover.
-
-### 2. Set up API keys
-
-The router needs at least one provider API key. Set environment variables for the providers you want to use (see [Supported Providers](#supported-providers) for the full list), or add credentials through OpenClaw's `/auth` command.
-
-> **Tip:** At minimum, set `GEMINI_API_KEY` for the SIMPLE tier and authenticate Anthropic via `/auth` for the other tiers. This covers all four tiers.
-
 ### 3. Restart the gateway and verify
 
-Once your API keys are in place, restart the gateway so the plugin loads and registers its provider:
+Restart the gateway so the plugin loads and registers its provider:
 
 ```bash
 openclaw gateway restart
@@ -148,6 +208,8 @@ Then run the doctor to verify everything is working:
 ```
 
 ### 4. Set as primary model (recommended)
+
+> **Note:** Without this step, the router is installed but won't be invoked by default. You'd need to manually select it each time with `/model claw-llm-router/auto`.
 
 To route all prompts through the router automatically, set it as the primary model in `~/.openclaw/openclaw.json`:
 
