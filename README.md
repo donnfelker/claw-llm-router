@@ -114,13 +114,17 @@ Or install from a local directory during development:
 openclaw plugins install -l ./claw-llm-router
 ```
 
+> **Important:** Do **not** restart the gateway yet — configure your API keys first (step 2). When the gateway starts, the router plugin modifies `~/.openclaw/openclaw.json` to register itself as a provider. If the configuration is incomplete, this can leave the system in a broken state. See [Config Backup & Restore](#config-backup--restore) if you need to recover.
+
 ### 2. Set up API keys
 
 The router needs at least one provider API key. Set environment variables for the providers you want to use (see [Supported Providers](#supported-providers) for the full list), or add credentials through OpenClaw's `/auth` command.
 
 > **Tip:** At minimum, set `GEMINI_API_KEY` for the SIMPLE tier and authenticate Anthropic via `/auth` for the other tiers. This covers all four tiers.
 
-### 3. Restart and verify
+### 3. Restart the gateway and verify
+
+Once your API keys are in place, restart the gateway so the plugin loads and registers its provider:
 
 ```bash
 openclaw gateway restart
@@ -148,7 +152,11 @@ To route all prompts through the router automatically, set it as the primary mod
 }
 ```
 
-Restart the gateway after this change.
+Restart the gateway after this change so it picks up the new primary model:
+
+```bash
+openclaw gateway restart
+```
 
 ### Configure Tiers
 
@@ -285,6 +293,27 @@ It verifies:
 - Whether the router is set as the primary model
 
 Any issues are flagged with fix instructions (e.g., which env var to set, how to add a custom provider).
+
+### Config Backup & Restore
+
+When the router writes to `~/.openclaw/openclaw.json` (e.g., during install or config injection), it automatically creates a timestamped backup first:
+
+```
+~/.openclaw/openclaw.json.bak.claw-llm-router.<timestamp>
+```
+
+If anything goes wrong, you can restore the backup:
+
+```bash
+# List available backups (most recent last)
+ls -t ~/.openclaw/openclaw.json.bak.claw-llm-router.*
+
+# Restore the most recent backup
+cp "$(ls -t ~/.openclaw/openclaw.json.bak.claw-llm-router.* | head -1)" ~/.openclaw/openclaw.json
+
+# Restart the gateway so it picks up the restored config
+openclaw gateway restart
+```
 
 ### Disable or Uninstall
 
