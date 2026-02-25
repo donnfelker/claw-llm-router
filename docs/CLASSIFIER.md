@@ -17,7 +17,7 @@ User prompt
   Tier assigned
 ```
 
-The classifier is 100% local — 15-dimension weighted scoring that runs in <1ms with no API calls. Ambiguous prompts (near tier boundaries) default to the rule-based result rather than calling an external LLM, because the MEDIUM tier is cheap enough to be a safe default.
+The classifier is 100% local — 15-dimension weighted scoring that runs locally with no API calls. Ambiguous prompts (near tier boundaries) default to the rule-based result rather than calling an external LLM, because the MEDIUM tier is cheap enough to be a safe default.
 
 ### Why no LLM fallback?
 

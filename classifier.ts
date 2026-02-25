@@ -1,7 +1,7 @@
 /**
  * Claw LLM Router — Prompt Classifier
  *
- * 15-dimension weighted scoring. Runs 100% locally in <1ms.
+ * 15-dimension weighted scoring. Runs 100% locally, super fast.
  * No external API calls. Translated from classifier.py.
  */
 

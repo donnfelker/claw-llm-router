@@ -1,6 +1,6 @@
 # Claw LLM Router
 
-An [OpenClaw](https://openclaw.ai) plugin that cuts LLM costs **40–80%** by classifying prompts and routing them to the cheapest capable model. Simple questions go to fast/cheap models (Gemini Flash at ~$0.15/1M tokens); complex tasks go to frontier models. All routing happens locally in <1ms.
+An [OpenClaw](https://openclaw.ai) plugin that cuts LLM costs **40–80%** by classifying prompts and routing them to the cheapest capable model. Simple questions go to fast/cheap models (Gemini Flash at ~$0.15/1M tokens); complex tasks go to frontier models. All routing happens locally, super fast.
 
 > **🚨 Warning:** This plugin modifies `~/.openclaw/openclaw.json` at startup to register itself as a provider. If misconfigured, this can leave your gateway in a broken state. A backup is created automatically before each write (see [Config Backup & Restore](#config-backup--restore)), but proceed with caution — make sure your API keys are set up **before** restarting the gateway. Read the [Quickstart](#quickstart) carefully. 🚨
 
@@ -21,7 +21,7 @@ LLM costs add up fast when every prompt hits a frontier model. Most prompts don'
 
 The router runs as a **local HTTP proxy** inside the OpenClaw gateway process on port 8401. When you set it as the primary model, OpenClaw sends all chat completion requests to the router instead of directly to a provider. The router then:
 
-1. **Classifies** the prompt locally using a rule-based scorer (no external API calls, <1ms)
+1. **Classifies** the prompt locally using a rule-based scorer (no external API calls, super fast)
 2. **Picks a tier** (SIMPLE, MEDIUM, COMPLEX, or REASONING) based on the score
 3. **Forwards** the request to the provider/model assigned to that tier using your API keys
 4. **Falls back** to a higher tier if the chosen provider fails

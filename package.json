@@ -1,7 +1,7 @@
 {
   "name": "claw-llm-router",
   "version": "1.0.2",
-  "description": "OpenClaw plugin that cuts LLM costs 40-80% by routing prompts to the cheapest capable model. 15-dimension classifier, <1ms local routing, automatic fallback chain.",
+  "description": "OpenClaw plugin that cuts LLM costs 40-80% by routing prompts to the cheapest capable model. 15-dimension classifier, super fast local routing, automatic fallback chain.",
   "type": "module",
   "author": "Donn Felker",
   "license": "MIT",

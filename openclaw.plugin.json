@@ -1,7 +1,7 @@
 {
   "id": "claw-llm-router",
   "name": "Claw LLM Router",
-  "description": "Local prompt classifier that routes to the cheapest capable model. 15-dimension weighted scoring, <1ms local routing. Supports any OpenAI-compatible provider + Anthropic native API. Direct to providers via your own API keys — no third parties.",
+  "description": "Local prompt classifier that routes to the cheapest capable model. 15-dimension weighted scoring, super fast local routing. Supports any OpenAI-compatible provider + Anthropic native API. Direct to providers via your own API keys — no third parties.",
   "version": "1.0.0",
   "author": "Donn Felker",
   "license": "MIT",

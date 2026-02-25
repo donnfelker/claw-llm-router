@@ -448,7 +448,7 @@ export default {
   name: "Claw LLM Router",
   version: "1.0.0",
   description:
-    "Local prompt classifier that routes to the cheapest capable model. 15-dimension weighted scoring, <1ms local routing. Direct to providers via your own API keys.",
+    "Local prompt classifier that routes to the cheapest capable model. 15-dimension weighted scoring, super fast local routing. Direct to providers via your own API keys.",
 
   register(api: OpenClawPluginApi): void {
     const log = api.logger;
