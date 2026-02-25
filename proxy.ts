@@ -188,7 +188,7 @@ async function handleChatCompletion(
   }
   if (!res.writableEnded) {
     const message = allMissingKeys
-      ? `No API keys configured. Run /router doctor to see what's needed, or set API keys for your providers (e.g. GEMINI_API_KEY, ANTHROPIC_API_KEY). See: https://github.com/anthropics/claw-llm-router#setup`
+      ? `No API keys configured. Run /router doctor to see what's needed, or set API keys for your providers (e.g. GEMINI_API_KEY, ANTHROPIC_API_KEY). See: https://github.com/donnfelker/claw-llm-router#troubleshooting`
       : `All providers failed: ${lastError?.message}`;
     res.end(
       JSON.stringify({

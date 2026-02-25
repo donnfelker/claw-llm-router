@@ -98,6 +98,7 @@ const OPENCLAW_CONFIG_PATH = `${HOME}/.openclaw/openclaw.json`;
 const AUTH_PROFILES_PATH = `${HOME}/.openclaw/agents/main/agent/auth-profiles.json`;
 
 const LOG_PREFIX = "[claw-llm-router]";
+const DOCS_URL = "https://github.com/donnfelker/claw-llm-router#troubleshooting";
 
 // ── Atomic config write ───────────────────────────────────────────────────────
 
@@ -154,8 +155,10 @@ function injectModelsConfig(log: PluginLogger): void {
   try {
     atomicWriteJson(OPENCLAW_CONFIG_PATH, config);
     log.info(`${LOG_PREFIX} Provider config written to openclaw.json`);
+    log.info(`${LOG_PREFIX} If something goes wrong, see: ${DOCS_URL}`);
   } catch (err) {
     log.error(`${LOG_PREFIX} Failed to write openclaw.json: ${err}`);
+    log.error(`${LOG_PREFIX} Troubleshooting: ${DOCS_URL}`);
   }
 }
 
@@ -222,6 +225,7 @@ function logApiKeyWarnings(log: PluginLogger): void {
       log.warn(`${LOG_PREFIX}   ${line}`);
     }
     log.warn(`${LOG_PREFIX}   Run /router doctor for full diagnostics`);
+    log.warn(`${LOG_PREFIX}   Troubleshooting: ${DOCS_URL}`);
   }
 }
 
@@ -597,6 +601,6 @@ export default {
     );
     log.info(`${LOG_PREFIX} Registered before_model_resolve hook for OAuth override`);
 
-    log.info(`${LOG_PREFIX} Plugin ready`);
+    log.info(`${LOG_PREFIX} Plugin ready — docs: ${DOCS_URL}`);
   },
 };

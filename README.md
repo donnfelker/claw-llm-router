@@ -2,10 +2,12 @@
 
 An [OpenClaw](https://openclaw.ai) plugin that cuts LLM costs **40–80%** by classifying prompts and routing them to the cheapest capable model. Simple questions go to fast/cheap models (Gemini Flash at ~$0.15/1M tokens); complex tasks go to frontier models. All routing happens locally in <1ms.
 
+> **Warning:** This plugin modifies `~/.openclaw/openclaw.json` at startup to register itself as a provider. If misconfigured, this can leave your gateway in a broken state. A backup is created automatically before each write (see [Config Backup & Restore](#config-backup--restore)), but proceed with caution — make sure your API keys are set up **before** restarting the gateway. Read the [Quickstart](#quickstart) carefully.
+
 ## Table of Contents
 
 - [How It Works](#how-it-works) — tiers, providers, classification, fallback chain
-- [Quickstart](#quickstart) — install, API keys, gateway restart, primary model setup
+- [Quickstart / Install](#quickstart) — install, API keys, gateway restart, primary model setup
 - [Usage](#usage) — `/router` command, model selection, curl examples, endpoints
 - [Troubleshooting](#troubleshooting) — doctor, config backup & restore, disable/uninstall
 - [Testing](#testing)
