@@ -2,6 +2,15 @@
 
 An [OpenClaw](https://openclaw.ai) plugin that cuts LLM costs **40–80%** by classifying prompts and routing them to the cheapest capable model. Simple questions go to fast/cheap models (Gemini Flash at ~$0.15/1M tokens); complex tasks go to frontier models. All routing happens locally in <1ms.
 
+## Table of Contents
+
+- [How It Works](#how-it-works) — tiers, providers, classification, fallback chain
+- [Quickstart](#quickstart) — install, API keys, gateway restart, primary model setup
+- [Usage](#usage) — `/router` command, model selection, curl examples, endpoints
+- [Troubleshooting](#troubleshooting) — doctor, config backup & restore, disable/uninstall
+- [Testing](#testing)
+- [Adding a New Provider](#adding-a-new-provider)
+
 ## Why
 
 LLM costs add up fast when every prompt hits a frontier model. Most prompts don't need one. "What is the capital of France?" doesn't need Claude Opus — Gemini Flash answers it for 100x less. The router makes this automatic: you interact with a single model (`claw-llm-router/auto`) and the classifier picks the right backend.
