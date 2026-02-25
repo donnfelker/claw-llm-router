@@ -305,19 +305,22 @@ Any issues are flagged with fix instructions (e.g., which env var to set, how to
 
 ### Config Backup & Restore
 
-When the router writes to `~/.openclaw/openclaw.json` (e.g., during install or config injection), it automatically creates a timestamped backup first:
+Every time the router writes to `~/.openclaw/openclaw.json` (e.g., during first startup or config injection), it creates a timestamped backup first. Backups are identified by the `.bak.claw-llm-router.` infix in the filename:
 
 ```
 ~/.openclaw/openclaw.json.bak.claw-llm-router.<timestamp>
 ```
 
-If anything goes wrong, you can restore the backup:
+The **first** backup (oldest timestamp) is your original config from before the router ever modified anything. This is the one you want when doing a full uninstall. The **most recent** backup (newest timestamp) reflects the last known state before the router's latest write.
 
 ```bash
-# List available backups (most recent last)
+# List all router backups (most recent first)
 ls -t ~/.openclaw/openclaw.json.bak.claw-llm-router.*
 
-# Restore the most recent backup
+# Restore the original pre-router config (first backup ever made)
+cp "$(ls -tr ~/.openclaw/openclaw.json.bak.claw-llm-router.* | head -1)" ~/.openclaw/openclaw.json
+
+# Or restore the most recent backup
 cp "$(ls -t ~/.openclaw/openclaw.json.bak.claw-llm-router.* | head -1)" ~/.openclaw/openclaw.json
 
 # Restart the gateway so it picks up the restored config
@@ -333,24 +336,25 @@ openclaw plugins disable claw-llm-router
 openclaw gateway restart
 ```
 
-If you set the router as your primary model, revert that first by removing (or changing) the `primary` field in `~/.openclaw/openclaw.json`:
+When disabling or uninstalling, you should also restore your `openclaw.json` to remove the provider config the router injected. The cleanest way is to restore from the first backup — your original config from before the router was ever installed:
 
-```json
-{
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "anthropic/claude-sonnet-4-6"
-      }
-    }
-  }
-}
+```bash
+# Restore original pre-router config
+cp "$(ls -tr ~/.openclaw/openclaw.json.bak.claw-llm-router.* | head -1)" ~/.openclaw/openclaw.json
 ```
+
+This also reverts the primary model setting if you changed it to `claw-llm-router/auto`.
 
 To fully uninstall:
 
 ```bash
+# 1. Restore original config
+cp "$(ls -tr ~/.openclaw/openclaw.json.bak.claw-llm-router.* | head -1)" ~/.openclaw/openclaw.json
+
+# 2. Remove the plugin
 openclaw plugins uninstall claw-llm-router
+
+# 3. Restart the gateway
 openclaw gateway restart
 ```
 
