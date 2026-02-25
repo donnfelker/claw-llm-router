@@ -2,6 +2,13 @@
 
 All notable changes to claw-llm-router are documented in this file.
 
+## [1.0.3] - 2026-02-25
+
+### Added
+
+- CHANGELOG.md for tracking project changes
+- Changelog maintenance instructions to AGENTS.md
+
 ## [1.0.2] - 2026-02-25
 
 ### Changed
