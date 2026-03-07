@@ -67,6 +67,7 @@ const OPENAI_ONLY_PARAMS = new Set([
   "store",
   "metadata",
   "stream_options",
+  "max_completion_tokens", // Newer OpenAI param - convert to max_tokens instead
 ]);
 
 function buildAnthropicBody(
@@ -88,7 +89,9 @@ function buildAnthropicBody(
   anthropicBody.model = modelId;
   anthropicBody.messages = messages;
   if (systemText) anthropicBody.system = systemText;
-  anthropicBody.max_tokens = (body.max_tokens as number) ?? 8192;
+  // Support both max_tokens and max_completion_tokens (newer OpenAI param)
+  anthropicBody.max_tokens =
+    (body.max_tokens as number) ?? (body.max_completion_tokens as number) ?? 8192;
 
   return anthropicBody;
 }

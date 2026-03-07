@@ -154,6 +154,37 @@ describe("buildAnthropicBody", () => {
     const result = buildAnthropicBody(body, "claude-sonnet-4-6", undefined, []);
     assert.equal("system" in result, false);
   });
+
+  it("converts max_completion_tokens to max_tokens", () => {
+    const body = { model: "gpt-4", messages: [], max_completion_tokens: 500 };
+    const result = buildAnthropicBody(body, "claude-sonnet-4-6", undefined, []);
+    assert.equal(result.max_tokens, 500);
+    assert.equal(result.max_completion_tokens, undefined);
+  });
+
+  it("prefers max_tokens over max_completion_tokens when both present", () => {
+    const body = { model: "gpt-4", messages: [], max_tokens: 300, max_completion_tokens: 500 };
+    const result = buildAnthropicBody(body, "claude-sonnet-4-6", undefined, []);
+    assert.equal(result.max_tokens, 300);
+    assert.equal(result.max_completion_tokens, undefined);
+  });
+
+  it("strips max_completion_tokens from OpenAI-only params", () => {
+    const body = {
+      model: "gpt-4",
+      messages: [],
+      max_completion_tokens: 1000,
+      store: true,
+      metadata: { foo: "bar" },
+    };
+    const result = buildAnthropicBody(body, "claude-sonnet-4-6", undefined, []);
+    // max_completion_tokens should be stripped and converted to max_tokens
+    assert.equal(result.max_tokens, 1000);
+    assert.equal(result.max_completion_tokens, undefined);
+    // Other OpenAI-only params should also be stripped
+    assert.equal(result.store, undefined);
+    assert.equal(result.metadata, undefined);
+  });
 });
 
 describe("mapStopReason", () => {

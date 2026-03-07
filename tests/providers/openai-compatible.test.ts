@@ -244,4 +244,128 @@ describe("OpenAICompatibleProvider", () => {
       },
     );
   });
+
+  it("converts max_completion_tokens to max_tokens for non-OpenAI providers", async () => {
+    let capturedPayload: any;
+
+    globalThis.fetch = mock.fn(async (_url: any, opts: any) => {
+      capturedPayload = JSON.parse(opts.body);
+      return {
+        ok: true,
+        json: async () => ({ choices: [], usage: {} }),
+      };
+    }) as any;
+
+    const log = makeLogger();
+    const res = makeRes();
+
+    await provider.chatCompletion(
+      {
+        messages: [{ role: "user", content: "test" }],
+        max_completion_tokens: 1000,
+      },
+      { modelId: "gemini-2.5-flash", apiKey: "test-key", baseUrl: "https://api.example.com/v1" },
+      false,
+      res,
+      log,
+    );
+
+    // Should convert max_completion_tokens → max_tokens for non-OpenAI
+    assert.equal(capturedPayload.max_tokens, 1000);
+    assert.equal(capturedPayload.max_completion_tokens, undefined);
+  });
+
+  it("preserves max_completion_tokens for OpenAI", async () => {
+    let capturedPayload: any;
+
+    globalThis.fetch = mock.fn(async (_url: any, opts: any) => {
+      capturedPayload = JSON.parse(opts.body);
+      return {
+        ok: true,
+        json: async () => ({ choices: [], usage: {} }),
+      };
+    }) as any;
+
+    const log = makeLogger();
+    const res = makeRes();
+
+    await provider.chatCompletion(
+      {
+        messages: [{ role: "user", content: "test" }],
+        max_completion_tokens: 1000,
+      },
+      { modelId: "gpt-4", apiKey: "test-key", baseUrl: "https://api.openai.com/v1" },
+      false,
+      res,
+      log,
+    );
+
+    // Should preserve max_completion_tokens for OpenAI (it's their newer parameter)
+    assert.equal(capturedPayload.max_completion_tokens, 1000);
+    assert.equal(capturedPayload.max_tokens, undefined);
+  });
+
+  it("prefers max_tokens over max_completion_tokens for non-OpenAI when both present", async () => {
+    let capturedPayload: any;
+
+    globalThis.fetch = mock.fn(async (_url: any, opts: any) => {
+      capturedPayload = JSON.parse(opts.body);
+      return {
+        ok: true,
+        json: async () => ({ choices: [], usage: {} }),
+      };
+    }) as any;
+
+    const log = makeLogger();
+    const res = makeRes();
+
+    await provider.chatCompletion(
+      {
+        messages: [{ role: "user", content: "test" }],
+        max_tokens: 500,
+        max_completion_tokens: 1000,
+      },
+      { modelId: "gemini-2.5-flash", apiKey: "test-key", baseUrl: "https://api.example.com/v1" },
+      false,
+      res,
+      log,
+    );
+
+    // Should keep max_tokens and not override with max_completion_tokens for non-OpenAI
+    assert.equal(capturedPayload.max_tokens, 500);
+    assert.equal(capturedPayload.max_completion_tokens, undefined);
+  });
+
+  it("strips non-standard fields like store", async () => {
+    let capturedPayload: any;
+
+    globalThis.fetch = mock.fn(async (_url: any, opts: any) => {
+      capturedPayload = JSON.parse(opts.body);
+      return {
+        ok: true,
+        json: async () => ({ choices: [], usage: {} }),
+      };
+    }) as any;
+
+    const log = makeLogger();
+    const res = makeRes();
+
+    await provider.chatCompletion(
+      {
+        messages: [{ role: "user", content: "test" }],
+        store: true,
+        metadata: { foo: "bar" },
+        max_tokens: 100,
+      },
+      { modelId: "gemini-2.5-flash", apiKey: "test-key", baseUrl: "https://api.example.com/v1" },
+      false,
+      res,
+      log,
+    );
+
+    // Should strip non-standard fields
+    assert.equal(capturedPayload.store, undefined);
+    assert.equal(capturedPayload.metadata, undefined);
+    assert.equal(capturedPayload.max_tokens, 100);
+  });
 });
