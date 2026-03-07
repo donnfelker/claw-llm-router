@@ -21,7 +21,6 @@ const ALLOWED_PARAMS = new Set([
   "model",
   "stream",
   "max_tokens",
-  "max_completion_tokens",
   "temperature",
   "top_p",
   "n",
@@ -41,13 +40,31 @@ const ALLOWED_PARAMS = new Set([
   "service_tier",
 ]);
 
-function sanitizeBody(body: Record<string, unknown>): Record<string, unknown> {
+// OpenAI supports max_completion_tokens (newer parameter), but most other providers don't
+const OPENAI_ONLY_PARAMS = new Set(["max_completion_tokens"]);
+
+function isOpenAI(baseUrl: string): boolean {
+  return baseUrl.includes("api.openai.com");
+}
+
+function sanitizeBody(body: Record<string, unknown>, baseUrl: string): Record<string, unknown> {
   const clean: Record<string, unknown> = {};
+  const allowOpenAIParams = isOpenAI(baseUrl);
+
   for (const [key, value] of Object.entries(body)) {
     if (ALLOWED_PARAMS.has(key)) {
       clean[key] = value;
+    } else if (allowOpenAIParams && OPENAI_ONLY_PARAMS.has(key)) {
+      // OpenAI-specific params are only allowed for OpenAI
+      clean[key] = value;
     }
   }
+
+  // For non-OpenAI providers: convert max_completion_tokens → max_tokens
+  if (!allowOpenAIParams && body.max_completion_tokens && !clean.max_tokens) {
+    clean.max_tokens = body.max_completion_tokens;
+  }
+
   return clean;
 }
 
@@ -62,7 +79,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
     log: PluginLogger,
   ): Promise<void> {
     const url = `${spec.baseUrl}/chat/completions`;
-    const payload = { ...sanitizeBody(body), model: spec.modelId, stream };
+    const payload = { ...sanitizeBody(body, spec.baseUrl), model: spec.modelId, stream };
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
